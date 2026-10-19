@@ -124,6 +124,14 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
+app.get('/styles.css', (req, res) => {
+  res.type('text/css').sendFile(path.join(__dirname, 'styles.css'));
+});
+
+app.get('/app.js', (req, res) => {
+  res.type('application/javascript').sendFile(path.join(__dirname, 'app.js'));
+});
+
 // ============================================================================
 // 1. AUTENTICACIÓN: CREAR CUENTA, INICIAR SESIÓN Y DISCORD OAUTH2
 // ============================================================================
