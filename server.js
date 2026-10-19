@@ -33,15 +33,20 @@ const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID || 'TU_DISCORD_CLIENT_ID
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || 'TU_DISCORD_CLIENT_SECRET';
 const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || `http://localhost:${PORT}/auth/discord/callback`;
 
+const isVercel = Boolean(process.env.VERCEL);
 const DATA_DIR = path.join(__dirname, 'data');
-const EXPORTS_DIR = path.join(__dirname, 'exports');
-const BIN_DIR = path.join(__dirname, 'bin');
+const EXPORTS_DIR = isVercel ? '/tmp/exports' : path.join(__dirname, 'exports');
+const BIN_DIR = isVercel ? '/tmp/bin' : path.join(__dirname, 'bin');
 
-[DATA_DIR, EXPORTS_DIR, BIN_DIR].forEach((dir) => {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-});
+try {
+  [DATA_DIR, EXPORTS_DIR, BIN_DIR].forEach((dir) => {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+  });
+} catch (e) {
+  // En entornos serverless como Vercel el disco de la aplicación es read-only
+}
 
 function getFFmpegBinary() {
   if (ffmpegStaticPath && fs.existsSync(ffmpegStaticPath)) {
@@ -87,6 +92,7 @@ function requireModerator(req, res, next) {
 const db = require('./db');
 
 function ensureFallbackPreviewVideo() {
+  if (isVercel) return;
   const samplePath = path.join(EXPORTS_DIR, 'fallback_yt_preview.mp4');
   if (fs.existsSync(samplePath)) return;
 
@@ -110,7 +116,13 @@ function ensureFallbackPreviewVideo() {
     () => {}
   );
 }
-ensureFallbackPreviewVideo();
+if (!isVercel) {
+  ensureFallbackPreviewVideo();
+}
+
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
 
 // ============================================================================
 // 1. AUTENTICACIÓN CON DISCORD (JUGADORES) Y LOGIN DE MODERADOR INTERNO

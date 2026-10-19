@@ -71,8 +71,12 @@ function readLocalDb() {
 }
 
 function writeLocalDb(data) {
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-  fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf8');
+  try {
+    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf8');
+  } catch (err) {
+    console.warn('[LOCAL DB] No se pudo escribir en disco local (read-only):', err.message);
+  }
 }
 
 // -----------------------------------------------------------------------------
