@@ -125,17 +125,61 @@ app.get('/', (req, res) => {
 });
 
 // ============================================================================
-// 1. AUTENTICACIÓN CON DISCORD (JUGADORES) Y LOGIN DE MODERADOR INTERNO
+// 1. AUTENTICACIÓN: CREAR CUENTA, INICIAR SESIÓN Y DISCORD OAUTH2
 // ============================================================================
+
+app.get('/api/auth/status', (req, res) => {
+  res.json({
+    ok: true,
+    discordConfigured: Boolean(DISCORD_CLIENT_ID && DISCORD_CLIENT_ID !== 'TU_DISCORD_CLIENT_ID')
+  });
+});
+
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { email, password, username, clan, role } = req.body;
+    if (!email || !password || !username) {
+      return res.status(400).json({ ok: false, error: 'Email, contraseña y nombre militar son obligatorios.' });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ ok: false, error: 'La contraseña debe tener al menos 6 caracteres.' });
+    }
+    const result = await db.registerUser({ email, password, username, clan, role });
+    if (!result.ok) {
+      return res.status(400).json(result);
+    }
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ ok: false, error: 'Email y contraseña requeridos.' });
+    }
+    const result = await db.loginUser({ email, password });
+    if (!result.ok) {
+      return res.status(400).json(result);
+    }
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 app.get('/auth/discord', (req, res) => {
   if (DISCORD_CLIENT_ID === 'TU_DISCORD_CLIENT_ID') {
     return res.redirect('/?discord_demo=1');
   }
+  const redirectUri = process.env.DISCORD_REDIRECT_URI || `${req.protocol}://${req.get('host')}/auth/discord/callback`;
   const params = new URLSearchParams({
     client_id: DISCORD_CLIENT_ID,
-    redirect_uri: DISCORD_REDIRECT_URI,
+    redirect_uri: redirectUri,
     response_type: 'code',
-    scope: 'identify guilds'
+    scope: 'identify'
   });
   res.redirect(`https://discord.com/api/oauth2/authorize?${params.toString()}`);
 });
@@ -145,6 +189,7 @@ app.get('/auth/discord/callback', async (req, res) => {
   if (!code) return res.redirect('/');
 
   try {
+    const redirectUri = process.env.DISCORD_REDIRECT_URI || `${req.protocol}://${req.get('host')}/auth/discord/callback`;
     const tokenRes = await fetch('https://discord.com/api/oauth2/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -153,7 +198,7 @@ app.get('/auth/discord/callback', async (req, res) => {
         client_secret: DISCORD_CLIENT_SECRET,
         grant_type: 'authorization_code',
         code,
-        redirect_uri: DISCORD_REDIRECT_URI
+        redirect_uri: redirectUri
       })
     });
     const tokenData = await tokenRes.json();

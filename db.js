@@ -476,6 +476,108 @@ async function dispatchWinners(dispatchEntry, { queueIds, hallOfFameWinners, nex
   return true;
 }
 
+// -----------------------------------------------------------------------------
+// AUTENTICACIÓN (SUPABASE AUTH + LOCAL FALLBACK)
+// -----------------------------------------------------------------------------
+
+async function registerUser({ email, password, username, clan, role }) {
+  if (isSupabaseEnabled && supabase) {
+    try {
+      const cleanUname = username.startsWith('@') ? username : '@' + username;
+      const { data, error } = await supabase.auth.admin.createUser({
+        email: email.trim().toLowerCase(),
+        password,
+        email_confirm: true,
+        user_metadata: {
+          username: cleanUname,
+          clan: clan?.trim() || '[Recluta]',
+          role: role || 'Fusilero'
+        }
+      });
+
+      if (error) {
+        return { ok: false, error: error.message };
+      }
+
+      return {
+        ok: true,
+        user: {
+          id: data.user.id,
+          email: data.user.email,
+          username: data.user.user_metadata?.username || cleanUname,
+          clan: data.user.user_metadata?.clan || '[Recluta]',
+          role: data.user.user_metadata?.role || 'Fusilero'
+        }
+      };
+    } catch (err) {
+      console.error('[SUPABASE AUTH] Error en registerUser:', err.message);
+      return { ok: false, error: err.message };
+    }
+  }
+
+  // Fallback Local
+  const cleanUname = username.startsWith('@') ? username : '@' + username;
+  return {
+    ok: true,
+    user: {
+      id: 'local_' + Date.now(),
+      email: email.trim().toLowerCase(),
+      username: cleanUname,
+      clan: clan?.trim() || '[Recluta]',
+      role: role || 'Fusilero'
+    }
+  };
+}
+
+async function loginUser({ email, password }) {
+  if (isSupabaseEnabled && supabase) {
+    try {
+      const anonKey = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY || SUPABASE_KEY;
+      const authClient = createClient(SUPABASE_URL, anonKey);
+
+      const { data, error } = await authClient.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password
+      });
+
+      if (error) {
+        return { ok: false, error: error.message };
+      }
+
+      const meta = data.user.user_metadata || {};
+      return {
+        ok: true,
+        user: {
+          id: data.user.id,
+          email: data.user.email,
+          username: meta.username || data.user.email.split('@')[0],
+          clan: meta.clan || '[Recluta]',
+          role: meta.role || 'Fusilero'
+        },
+        session: {
+          accessToken: data.session?.access_token,
+          expiresAt: data.session?.expires_at
+        }
+      };
+    } catch (err) {
+      console.error('[SUPABASE AUTH] Error en loginUser:', err.message);
+      return { ok: false, error: err.message };
+    }
+  }
+
+  // Fallback Local
+  return {
+    ok: true,
+    user: {
+      id: 'local_' + Date.now(),
+      email: email.trim().toLowerCase(),
+      username: '@' + email.split('@')[0],
+      clan: '[Recluta]',
+      role: 'Fusilero'
+    }
+  };
+}
+
 module.exports = {
   isSupabaseEnabled,
   getState,
@@ -484,5 +586,7 @@ module.exports = {
   addComment,
   updateWeeklyConfig,
   deleteClip,
-  dispatchWinners
+  dispatchWinners,
+  registerUser,
+  loginUser
 };

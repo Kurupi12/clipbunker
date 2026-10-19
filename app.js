@@ -43,12 +43,7 @@ function setStatusWithSvg(el, iconName, messageText) {
   el.innerHTML = `${svgIcon(iconName)} <span>${escapeHtml(cleanMsg)}</span>`;
 }
 
-let currentUser = JSON.parse(localStorage.getItem('hll_discord_user')) || {
-  id: 'discord_8849201944',
-  username: 'Santiago_Cmdr#1944',
-  clan: '[501st] División Blindada',
-  role: 'Comandante Nivel X'
-};
+let currentUser = JSON.parse(localStorage.getItem('hll_discord_user')) || null;
 
 // Token de sesión exclusivo del Administrador/Moderador (SIEMPRE inicia oculto al cargar la página pública)
 localStorage.removeItem('hll_mod_token');
@@ -231,17 +226,22 @@ function isModeratorLoggedIn() {
 function checkDiscordOAuthCallbackParams() {
   const params = new URLSearchParams(window.location.search);
   if (params.has('discord_user')) {
+    const dUser = params.get('discord_user');
     currentUser = {
       id: 'discord_' + (params.get('discord_id') || Date.now()),
-      username: params.get('discord_user'),
+      username: dUser.startsWith('@') ? dUser : '@' + dUser,
       clan: '[Verificado Discord OAuth2]',
-      role: 'Soldado Oficial Discord'
+      role: 'Fusilero'
     };
     localStorage.setItem('hll_discord_user', JSON.stringify(currentUser));
     window.history.replaceState({}, document.title, window.location.pathname);
+    setTimeout(() => showToast(`¡Conectado con Discord como ${currentUser.username}!`), 400);
   } else if (params.has('discord_demo')) {
     window.history.replaceState({}, document.title, window.location.pathname);
-    setTimeout(() => openDiscordModal(), 250);
+    setTimeout(() => {
+      openDiscordModal();
+      switchAuthTab('discord');
+    }, 250);
   }
 }
 
@@ -452,57 +452,242 @@ function startWeeklyCountdown() {
 }
 
 // ============================================================================
-// LOGIN CON DISCORD (JUGADORES)
+// LOGIN CON DISCORD & REGISTRO DE CUENTA (JUGADORES)
 // ============================================================================
+function showToast(message, isError = false) {
+  let toast = document.getElementById('tacticalToast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'tacticalToast';
+    toast.style.cssText = `
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 99999;
+      background: #181c14;
+      border: 1px solid var(--amber-command);
+      color: #fff;
+      padding: 12px 18px;
+      border-radius: 4px;
+      font-family: var(--font-heading);
+      font-size: 0.9rem;
+      box-shadow: 0 4px 18px rgba(0,0,0,0.6);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      transform: translateY(20px);
+      opacity: 0;
+    `;
+    document.body.appendChild(toast);
+  }
+  toast.style.borderColor = isError ? 'var(--crimson-war)' : 'var(--amber-command)';
+  toast.innerHTML = `${svgIcon(isError ? 'close' : 'check')} <span>${escapeHtml(message)}</span>`;
+  toast.style.transform = 'translateY(0)';
+  toast.style.opacity = '1';
+
+  clearTimeout(toast._timeout);
+  toast._timeout = setTimeout(() => {
+    toast.style.transform = 'translateY(20px)';
+    toast.style.opacity = '0';
+  }, 4000);
+}
+
 function renderDiscordAuthUI() {
   const container = document.getElementById('discordAuthArea');
+  if (!container) return;
+
   if (!currentUser) {
     container.innerHTML = `
-      <button class="btn btn-discord" onclick="openDiscordModal()">
-        Login Discord
+      <button class="btn btn-discord" onclick="openDiscordModal()" style="font-size:0.82rem; padding:8px 14px; gap:8px;">
+        <svg class="svg-icon" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span>Ingresar / Crear Cuenta</span>
       </button>
     `;
   } else {
-    const cleanName = currentUser.username.replace(/^@/, '');
-    const initials = cleanName.slice(0, 2).toUpperCase();
+    const cleanName = (currentUser.username || 'Soldado').replace(/^@/, '');
+    const initials = cleanName.slice(0, 2).toUpperCase() || 'HLL';
     container.innerHTML = `
-      <div class="soldier-dogtag" onclick="openDiscordModal()" title="Cambiar cuenta de Discord">
+      <div class="soldier-dogtag" onclick="openDiscordModal()" title="Expediente de Servicio / Cambiar cuenta">
         <div class="soldier-avatar">${initials}</div>
         <div class="soldier-meta">
           <span class="soldier-name">${escapeHtml(currentUser.username)}</span>
-          <span class="soldier-rank">${escapeHtml(currentUser.clan)}</span>
+          <span class="soldier-rank">${escapeHtml(currentUser.clan || '[Recluta]')}</span>
         </div>
       </div>
     `;
   }
 }
 
-function openDiscordModal() {
-  if (currentUser) {
-    document.getElementById('discordUsernameInput').value = currentUser.username;
-    document.getElementById('discordClanInput').value = currentUser.clan;
-    document.getElementById('discordRoleInput').value = currentUser.role;
+function switchAuthTab(tab) {
+  const tabs = ['register', 'login', 'discord'];
+  tabs.forEach(t => {
+    const btn = document.getElementById('tabBtn' + t.charAt(0).toUpperCase() + t.slice(1));
+    const pane = t === 'discord' ? document.getElementById('paneDiscord') : (t === 'register' ? document.getElementById('formRegister') : document.getElementById('formLogin'));
+    if (btn) btn.classList.toggle('active', t === tab);
+    if (pane) {
+      if (t === tab) {
+        pane.style.display = 'block';
+        pane.classList.add('active');
+      } else {
+        pane.style.display = 'none';
+        pane.classList.remove('active');
+      }
+    }
+  });
+  setAuthStatusMessage('', false);
+}
+
+function setAuthStatusMessage(msg, isError = true) {
+  const el = document.getElementById('authStatusMsg');
+  if (!el) return;
+  if (!msg) {
+    el.style.display = 'none';
+    el.textContent = '';
+    return;
   }
+  el.style.display = 'block';
+  el.style.background = isError ? 'rgba(160, 30, 30, 0.4)' : 'rgba(40, 160, 60, 0.4)';
+  el.style.border = isError ? '1px solid #d33' : '1px solid #3c8';
+  el.style.color = isError ? '#ffaaaa' : '#bbfebb';
+  el.textContent = msg;
+}
+
+function openDiscordModal() {
+  const profileView = document.getElementById('authProfileView');
+  const formsContainer = document.getElementById('authFormsContainer');
+
+  if (currentUser) {
+    if (profileView) profileView.style.display = 'block';
+    if (formsContainer) formsContainer.style.display = 'none';
+
+    const cleanName = (currentUser.username || 'Soldado').replace(/^@/, '');
+    const initials = cleanName.slice(0, 2).toUpperCase() || 'HL';
+    const avatarEl = document.getElementById('profileAvatarBig');
+    if (avatarEl) avatarEl.textContent = initials;
+    const userEl = document.getElementById('profileUsername');
+    if (userEl) userEl.textContent = currentUser.username;
+    const clanRoleEl = document.getElementById('profileClanRole');
+    if (clanRoleEl) clanRoleEl.textContent = `${currentUser.clan || '[Recluta]'} // ${currentUser.role || 'Fusilero'}`;
+    const emailEl = document.getElementById('profileEmail');
+    if (emailEl) emailEl.textContent = currentUser.email ? `Email: ${currentUser.email}` : 'Identificado mediante Chapa / Discord';
+
+    // Estadísticas
+    const votedClips = (clipsData || []).filter(c => Array.isArray(c.voterIds) && c.voterIds.includes(currentUser.id)).length;
+    const submittedClips = (clipsData || []).filter(c => c.authorDiscordId === currentUser.id || c.authorDiscord === currentUser.username).length;
+    const votedEl = document.getElementById('profileVotedCount');
+    if (votedEl) votedEl.textContent = votedClips;
+    const clipsEl = document.getElementById('profileClipsCount');
+    if (clipsEl) clipsEl.textContent = submittedClips;
+  } else {
+    if (profileView) profileView.style.display = 'none';
+    if (formsContainer) formsContainer.style.display = 'block';
+    switchAuthTab('register');
+  }
+
   document.getElementById('discordModal').classList.add('open');
 }
 
 function closeDiscordModal() {
   document.getElementById('discordModal').classList.remove('open');
+  setAuthStatusMessage('', false);
 }
 
-function handleDiscordLogin(e) {
+async function handleAuthRegister(e) {
   e.preventDefault();
-  const uname = document.getElementById('discordUsernameInput').value.trim();
+  const email = document.getElementById('regEmail').value.trim();
+  const password = document.getElementById('regPassword').value;
+  const username = document.getElementById('regUsername').value.trim();
+  const clan = document.getElementById('regClan').value.trim() || '[Recluta]';
+  const role = document.getElementById('regRole').value;
+
+  const btn = document.getElementById('btnRegisterSubmit');
+  btn.disabled = true;
+  btn.textContent = 'Alistando soldado...';
+
+  try {
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, username, clan, role })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error || 'Error al crear cuenta.');
+    }
+
+    currentUser = data.user;
+    localStorage.setItem('hll_discord_user', JSON.stringify(currentUser));
+    renderDiscordAuthUI();
+    renderClips();
+    closeDiscordModal();
+    showToast(`¡Soldado ${currentUser.username} alistado en combate!`);
+  } catch (err) {
+    setAuthStatusMessage(err.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `${svgIcon('check')} Crear Cuenta de Soldado`;
+  }
+}
+
+async function handleAuthLogin(e) {
+  e.preventDefault();
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+
+  const btn = document.getElementById('btnLoginSubmit');
+  btn.disabled = true;
+  btn.textContent = 'Verificando expediente...';
+
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error || 'Credenciales inválidas o no encontradas.');
+    }
+
+    currentUser = data.user;
+    localStorage.setItem('hll_discord_user', JSON.stringify(currentUser));
+    renderDiscordAuthUI();
+    renderClips();
+    closeDiscordModal();
+    showToast(`¡Bienvenido de vuelta, ${currentUser.username}!`);
+  } catch (err) {
+    setAuthStatusMessage(err.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `${svgIcon('check')} Ingresar al Frente`;
+  }
+}
+
+function handleFastDiscordLogin(e) {
+  e.preventDefault();
+  const uname = document.getElementById('fastDiscordTag').value.trim();
+  const cleanUname = uname.startsWith('@') ? uname : '@' + uname;
   currentUser = {
-    id: 'discord_' + uname.toLowerCase().replace(/[^a-z0-9]/g, ''),
-    username: uname,
-    clan: document.getElementById('discordClanInput').value.trim(),
-    role: document.getElementById('discordRoleInput').value
+    id: 'discord_' + cleanUname.toLowerCase().replace(/[^a-z0-9]/g, ''),
+    username: cleanUname,
+    clan: document.getElementById('fastDiscordClan').value.trim() || '[Recluta]',
+    role: document.getElementById('fastDiscordRole').value || 'Fusilero'
   };
   localStorage.setItem('hll_discord_user', JSON.stringify(currentUser));
   renderDiscordAuthUI();
   renderClips();
   closeDiscordModal();
+  showToast(`Chapa activada: ${currentUser.username}`);
+}
+
+function handleLogout() {
+  currentUser = null;
+  localStorage.removeItem('hll_discord_user');
+  renderDiscordAuthUI();
+  renderClips();
+  closeDiscordModal();
+  showToast('Has cerrado sesión correctamente.');
 }
 
 // ============================================================================
