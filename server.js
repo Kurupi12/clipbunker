@@ -22,6 +22,7 @@ try {
 }
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3044;
 
 // Clave de acceso del Moderador (configurable en .env)
@@ -29,9 +30,22 @@ const MODERATOR_SECRET_KEY = process.env.MODERATOR_KEY || 'HLL-MOD-1944';
 const MODERATOR_TOKEN = 'mod_session_hll_1944_internal';
 
 // Configuración Discord OAuth2
-const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID || 'TU_DISCORD_CLIENT_ID';
-const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || 'TU_DISCORD_CLIENT_SECRET';
-const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || `http://localhost:${PORT}/auth/discord/callback`;
+const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID || '1561852439206830130';
+const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || 'H4-UbcLZ8pso7hHiiZTeTOutmtn5lgqP';
+const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || 'https://clipbunker.vercel.app/auth/discord/callback';
+
+function getRedirectUri(req) {
+  if (process.env.DISCORD_REDIRECT_URI) {
+    const host = req.get('host') || '';
+    if ((host.includes('localhost') || host.includes('127.0.0.1')) && !process.env.DISCORD_REDIRECT_URI.includes('localhost')) {
+      return `http://${host}/auth/discord/callback`;
+    }
+    return process.env.DISCORD_REDIRECT_URI;
+  }
+  const host = req.get('host') || 'clipbunker.vercel.app';
+  const proto = host.includes('localhost') || host.includes('127.0.0.1') ? 'http' : 'https';
+  return `${proto}://${host}/auth/discord/callback`;
+}
 
 const isVercel = Boolean(process.env.VERCEL);
 const DATA_DIR = path.join(__dirname, 'data');
@@ -192,10 +206,10 @@ app.post('/api/auth/fast-discord', async (req, res) => {
 });
 
 app.get('/auth/discord', (req, res) => {
-  if (DISCORD_CLIENT_ID === 'TU_DISCORD_CLIENT_ID' || !DISCORD_CLIENT_ID) {
+  if (!DISCORD_CLIENT_ID || DISCORD_CLIENT_ID === 'TU_DISCORD_CLIENT_ID') {
     return res.redirect('/?discord_not_configured=1');
   }
-  const redirectUri = process.env.DISCORD_REDIRECT_URI || `${req.protocol}://${req.get('host')}/auth/discord/callback`;
+  const redirectUri = getRedirectUri(req);
   const params = new URLSearchParams({
     client_id: DISCORD_CLIENT_ID,
     redirect_uri: redirectUri,
@@ -206,11 +220,15 @@ app.get('/auth/discord', (req, res) => {
 });
 
 app.get('/auth/discord/callback', async (req, res) => {
-  const { code } = req.query;
+  const { code, error, error_description } = req.query;
+  if (error) {
+    console.warn('[DISCORD OAUTH ERROR PARAM]', error, error_description);
+    return res.redirect(`/?discord_error=${encodeURIComponent(error_description || error)}`);
+  }
   if (!code) return res.redirect('/');
 
   try {
-    const redirectUri = process.env.DISCORD_REDIRECT_URI || `${req.protocol}://${req.get('host')}/auth/discord/callback`;
+    const redirectUri = getRedirectUri(req);
     const tokenRes = await fetch('https://discord.com/api/oauth2/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -224,16 +242,42 @@ app.get('/auth/discord/callback', async (req, res) => {
     });
     const tokenData = await tokenRes.json();
 
+    if (!tokenData.access_token) {
+      console.error('[DISCORD OAUTH TOKEN ERROR]', tokenData);
+      const desc = tokenData.error_description || tokenData.error || 'token_failed';
+      return res.redirect(`/?discord_error=${encodeURIComponent(desc)}`);
+    }
+
     const userRes = await fetch('https://discord.com/api/users/@me', {
       headers: { Authorization: `Bearer ${tokenData.access_token}` }
     });
     const userData = await userRes.json();
 
+    if (!userData || !userData.id) {
+      console.error('[DISCORD USER FETCH ERROR]', userData);
+      return res.redirect('/?discord_error=no_user_data');
+    }
+
+    try {
+      await db.registerFastDiscordUser({
+        username: userData.username,
+        clan: '[Verificado Discord OAuth2]',
+        role: 'Fusilero'
+      });
+    } catch (dbErr) {
+      console.warn('[DISCORD OAUTH] No se pudo sincronizar en Supabase:', dbErr.message);
+    }
+
+    const avatarUrl = userData.avatar
+      ? `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png`
+      : '';
+
     res.redirect(
-      `/?discord_user=${encodeURIComponent(userData.username)}&discord_id=${encodeURIComponent(userData.id)}`
+      `/?discord_user=${encodeURIComponent(userData.username)}&discord_id=${encodeURIComponent(userData.id)}&discord_avatar=${encodeURIComponent(avatarUrl)}`
     );
   } catch (error) {
-    res.redirect('/');
+    console.error('[DISCORD OAUTH CATCH]', error);
+    res.redirect(`/?discord_error=${encodeURIComponent(error.message || 'oauth_failed')}`);
   }
 });
 

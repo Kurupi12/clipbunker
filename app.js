@@ -227,15 +227,28 @@ function checkDiscordOAuthCallbackParams() {
   const params = new URLSearchParams(window.location.search);
   if (params.has('discord_user')) {
     const dUser = params.get('discord_user');
+    const dAvatar = params.get('discord_avatar') || '';
     currentUser = {
       id: 'discord_' + (params.get('discord_id') || Date.now()),
       username: dUser.startsWith('@') ? dUser : '@' + dUser,
       clan: '[Verificado Discord OAuth2]',
-      role: 'Fusilero'
+      role: 'Fusilero',
+      avatarUrl: dAvatar,
+      provider: 'discord_oauth'
     };
     localStorage.setItem('hll_discord_user', JSON.stringify(currentUser));
+    renderDiscordAuthUI();
+    renderClips();
     window.history.replaceState({}, document.title, window.location.pathname);
-    setTimeout(() => showToast(`¡Conectado con Discord como ${currentUser.username}!`), 400);
+    setTimeout(() => showToast(`¡Bienvenido al frente, ${currentUser.username}! Conectado con Discord oficial.`), 400);
+  } else if (params.has('discord_error')) {
+    const errReason = params.get('discord_error');
+    window.history.replaceState({}, document.title, window.location.pathname);
+    setTimeout(() => {
+      openDiscordModal();
+      switchAuthTab('discord');
+      setAuthStatusMessage(`Aviso de Discord: ${errReason}. También puedes ingresar con tu Chapa Rápida abajo sin contraseña.`, true);
+    }, 250);
   } else if (params.has('discord_not_configured') || params.has('discord_demo')) {
     window.history.replaceState({}, document.title, window.location.pathname);
     setTimeout(() => {
@@ -508,9 +521,12 @@ function renderDiscordAuthUI() {
   } else {
     const cleanName = (currentUser.username || 'Soldado').replace(/^@/, '');
     const initials = cleanName.slice(0, 2).toUpperCase() || 'HLL';
+    const avatarContent = currentUser.avatarUrl
+      ? `<img src="${escapeHtml(currentUser.avatarUrl)}" alt="Avatar" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;">`
+      : initials;
     container.innerHTML = `
       <div class="soldier-dogtag" onclick="openDiscordModal()" title="Expediente de Servicio / Cambiar cuenta">
-        <div class="soldier-avatar">${initials}</div>
+        <div class="soldier-avatar" style="overflow:hidden; display:flex; align-items:center; justify-content:center;">${avatarContent}</div>
         <div class="soldier-meta">
           <span class="soldier-name">${escapeHtml(currentUser.username)}</span>
           <span class="soldier-rank">${escapeHtml(currentUser.clan || '[Recluta]')}</span>
@@ -565,7 +581,13 @@ function openDiscordModal() {
     const cleanName = (currentUser.username || 'Soldado').replace(/^@/, '');
     const initials = cleanName.slice(0, 2).toUpperCase() || 'HL';
     const avatarEl = document.getElementById('profileAvatarBig');
-    if (avatarEl) avatarEl.textContent = initials;
+    if (avatarEl) {
+      if (currentUser.avatarUrl) {
+        avatarEl.innerHTML = `<img src="${escapeHtml(currentUser.avatarUrl)}" alt="Avatar" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;">`;
+      } else {
+        avatarEl.textContent = initials;
+      }
+    }
     const userEl = document.getElementById('profileUsername');
     if (userEl) userEl.textContent = currentUser.username;
     const clanRoleEl = document.getElementById('profileClanRole');
