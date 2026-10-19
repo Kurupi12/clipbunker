@@ -578,6 +578,83 @@ async function loginUser({ email, password }) {
   };
 }
 
+async function registerFastDiscordUser({ username, clan, role }) {
+  const cleanUname = username.startsWith('@') ? username : '@' + username;
+  const safeId = cleanUname.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const email = `${safeId || 'soldado'}@discord.clipbunker.app`;
+
+  if (isSupabaseEnabled && supabase) {
+    try {
+      const { data: usersData } = await supabase.auth.admin.listUsers();
+      const existing = (usersData?.users || []).find(u => u.email === email);
+
+      if (existing) {
+        await supabase.auth.admin.updateUserById(existing.id, {
+          user_metadata: {
+            username: cleanUname,
+            clan: clan?.trim() || existing.user_metadata?.clan || '[Recluta]',
+            role: role || existing.user_metadata?.role || 'Fusilero'
+          }
+        });
+
+        return {
+          ok: true,
+          user: {
+            id: existing.id,
+            email: existing.email,
+            username: cleanUname,
+            clan: clan?.trim() || existing.user_metadata?.clan || '[Recluta]',
+            role: role || existing.user_metadata?.role || 'Fusilero',
+            provider: 'discord_tag'
+          }
+        };
+      }
+
+      const { data, error } = await supabase.auth.admin.createUser({
+        email,
+        password: `DiscordHLL_${safeId}_1944!`,
+        email_confirm: true,
+        user_metadata: {
+          username: cleanUname,
+          clan: clan?.trim() || '[Recluta]',
+          role: role || 'Fusilero'
+        }
+      });
+
+      if (error) {
+        console.warn('[SUPABASE] Advertencia en registerFastDiscordUser:', error.message);
+      }
+
+      return {
+        ok: true,
+        user: {
+          id: data?.user?.id || ('discord_' + safeId),
+          email,
+          username: cleanUname,
+          clan: clan?.trim() || '[Recluta]',
+          role: role || 'Fusilero',
+          provider: 'discord_tag'
+        }
+      };
+    } catch (err) {
+      console.error('[SUPABASE AUTH] Error en registerFastDiscordUser:', err.message);
+    }
+  }
+
+  // Fallback Local
+  return {
+    ok: true,
+    user: {
+      id: 'discord_' + safeId,
+      email,
+      username: cleanUname,
+      clan: clan?.trim() || '[Recluta]',
+      role: role || 'Fusilero',
+      provider: 'discord_tag'
+    }
+  };
+}
+
 module.exports = {
   isSupabaseEnabled,
   getState,
@@ -588,5 +665,6 @@ module.exports = {
   deleteClip,
   dispatchWinners,
   registerUser,
-  loginUser
+  loginUser,
+  registerFastDiscordUser
 };

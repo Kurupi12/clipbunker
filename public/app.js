@@ -236,11 +236,12 @@ function checkDiscordOAuthCallbackParams() {
     localStorage.setItem('hll_discord_user', JSON.stringify(currentUser));
     window.history.replaceState({}, document.title, window.location.pathname);
     setTimeout(() => showToast(`¡Conectado con Discord como ${currentUser.username}!`), 400);
-  } else if (params.has('discord_demo')) {
+  } else if (params.has('discord_not_configured') || params.has('discord_demo')) {
     window.history.replaceState({}, document.title, window.location.pathname);
     setTimeout(() => {
       openDiscordModal();
       switchAuthTab('discord');
+      setAuthStatusMessage('Para "Iniciar con Discord Oficial", falta vincular el Client ID de Discord. Mientras tanto, ¡activa tu Chapa de Combate aquí abajo en 1 segundo!', false);
     }, 250);
   }
 }
@@ -664,21 +665,55 @@ async function handleAuthLogin(e) {
   }
 }
 
-function handleFastDiscordLogin(e) {
+async function handleFastDiscordLogin(e) {
   e.preventDefault();
   const uname = document.getElementById('fastDiscordTag').value.trim();
   const cleanUname = uname.startsWith('@') ? uname : '@' + uname;
-  currentUser = {
-    id: 'discord_' + cleanUname.toLowerCase().replace(/[^a-z0-9]/g, ''),
-    username: cleanUname,
-    clan: document.getElementById('fastDiscordClan').value.trim() || '[Recluta]',
-    role: document.getElementById('fastDiscordRole').value || 'Fusilero'
-  };
+  const clan = document.getElementById('fastDiscordClan').value.trim() || '[Recluta]';
+  const role = document.getElementById('fastDiscordRole').value || 'Fusilero';
+
+  const btn = e.target.querySelector('button[type="submit"]');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Registrando chapa en base de datos...';
+  }
+
+  try {
+    const res = await fetch('/api/auth/fast-discord', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: cleanUname, clan, role })
+    });
+    const data = await res.json();
+    if (data.ok && data.user) {
+      currentUser = data.user;
+    } else {
+      currentUser = {
+        id: 'discord_' + cleanUname.toLowerCase().replace(/[^a-z0-9]/g, ''),
+        username: cleanUname,
+        clan,
+        role
+      };
+    }
+  } catch (err) {
+    currentUser = {
+      id: 'discord_' + cleanUname.toLowerCase().replace(/[^a-z0-9]/g, ''),
+      username: cleanUname,
+      clan,
+      role
+    };
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Activar Chapa Rápida';
+    }
+  }
+
   localStorage.setItem('hll_discord_user', JSON.stringify(currentUser));
   renderDiscordAuthUI();
   renderClips();
   closeDiscordModal();
-  showToast(`Chapa activada: ${currentUser.username}`);
+  showToast(`¡Chapa activada y guardada en Supabase: ${currentUser.username}!`);
 }
 
 function handleLogout() {

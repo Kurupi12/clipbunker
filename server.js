@@ -178,9 +178,22 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
+app.post('/api/auth/fast-discord', async (req, res) => {
+  try {
+    const { username, clan, role } = req.body;
+    if (!username) {
+      return res.status(400).json({ ok: false, error: 'Tag de Discord es obligatorio.' });
+    }
+    const result = await db.registerFastDiscordUser({ username, clan, role });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 app.get('/auth/discord', (req, res) => {
-  if (DISCORD_CLIENT_ID === 'TU_DISCORD_CLIENT_ID') {
-    return res.redirect('/?discord_demo=1');
+  if (DISCORD_CLIENT_ID === 'TU_DISCORD_CLIENT_ID' || !DISCORD_CLIENT_ID) {
+    return res.redirect('/?discord_not_configured=1');
   }
   const redirectUri = process.env.DISCORD_REDIRECT_URI || `${req.protocol}://${req.get('host')}/auth/discord/callback`;
   const params = new URLSearchParams({
