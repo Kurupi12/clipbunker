@@ -121,20 +121,58 @@ body::before {
 
 .brand-logo {
   display: inline-flex;
-  align-items: flex-start;
+  align-items: center;
+  gap: 12px;
   text-decoration: none;
   color: var(--paper-aged);
-  background: rgba(14, 16, 12, 0.85);
-  border: 2px solid var(--amber-command);
-  border-radius: 6px;
-  padding: 8px 18px 9px 18px;
-  box-shadow: 0 0 10px rgba(224, 159, 45, 0.2), inset 0 0 12px rgba(0, 0, 0, 0.8);
-  transition: all 0.2s ease;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 2px 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
 .brand-logo:hover {
-  border-color: #ffd27d;
-  box-shadow: 0 0 16px var(--amber-glow);
+  transform: translateY(-1px);
+  opacity: 0.95;
+}
+
+.brand-emblem {
+  min-width: 44px;
+  height: 38px;
+  padding: 0 8px;
+  background: #11140e;
+  border: 2px solid var(--amber-command);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-stencil);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--amber-command);
+  letter-spacing: 1px;
+  position: relative;
+  box-shadow: 0 0 8px rgba(224, 159, 45, 0.25), inset 0 0 8px rgba(0, 0, 0, 0.8);
+}
+
+.brand-emblem::before,
+.brand-emblem::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 14px;
+  height: 2px;
+  background: var(--amber-command);
+}
+
+.brand-emblem::before {
+  top: -2px;
+}
+
+.brand-emblem::after {
+  bottom: -2px;
 }
 
 .brand-text h1 {
@@ -1247,7 +1285,7 @@ body::before {
   .brand-logo {
     width: 100%;
     justify-content: center;
-    padding: 8px 12px;
+    padding: 4px 0;
   }
 
   .brand-text h1 {
