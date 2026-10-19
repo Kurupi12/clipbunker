@@ -765,13 +765,105 @@ function isVotedByCurrentUser(clip) {
   return Boolean(clip.votedByMe);
 }
 
+function renderVacantSlotCard(rank) {
+  const titles = [
+    'Corona de Líder Semanal',
+    'Guardia de Honor (2do Puesto)',
+    'Escuadra Destacada (3er Puesto)'
+  ];
+  const descriptions = [
+    '¡El puesto #1 del frente está vacante! Publica tu mejor clip y sé el primer líder de la semana.',
+    'Espacio de combate reservado para la segunda mejor jugada votada por la comunidad.',
+    'Espacio abierto para la tercera jugada con más impacto de Hell Let Loose.'
+  ];
+  const tags = [
+    ['Líder Semanal', 'Trofeo de Oro', '0 Votos'],
+    ['Segundo al Mando', 'Plata', 'Disponible'],
+    ['Tercer Puesto', 'Bronce', 'Disponible']
+  ];
+  const isRank1 = rank === 1;
+
+  return `
+    <article class="clip-card vacant-slot ${isRank1 ? 'rank-1' : ''}">
+      <div class="clip-card-header">
+        <span class="clip-rank-badge">#${rank} ${isRank1 ? `${svgIcon('crown')} PUESTO VACANTE` : 'PUESTO VACANTE'}</span>
+        <span class="clip-coords">GRID -- // FRENTE HLL</span>
+      </div>
+
+      <div class="vacant-slot-media" onclick="openShareModal()" title="Haz clic para postular tu jugada en este puesto">
+        <div class="vacant-slot-icon">
+          ${isRank1 ? svgIcon('crown') : (rank === 2 ? svgIcon('shield') : svgIcon('star'))}
+        </div>
+        <div class="vacant-slot-status">
+          PUESTO #${rank} DISPONIBLE
+        </div>
+        <span style="font-size:0.75rem; color:var(--paper-muted); font-family:var(--font-typewriter);">
+          [CLICK PARA POSTULAR JUGADA]
+        </span>
+      </div>
+
+      <div class="clip-body">
+        <div>
+          <div class="clip-tags">
+            ${tags[rank - 1].map(t => `<span class="tag-pill" style="${isRank1 ? 'border-color:var(--amber-command); color:var(--amber-command);' : ''}">${escapeHtml(t)}</span>`).join('')}
+          </div>
+
+          <h3 class="clip-title" style="color:${isRank1 ? 'var(--amber-command)' : '#fff'};">
+            #${rank} // ${titles[rank - 1]}
+          </h3>
+
+          <p style="font-size:0.82rem; color:var(--paper-muted); margin-bottom:12px; line-height:1.4;">
+            ${descriptions[rank - 1]}
+          </p>
+        </div>
+
+        <div class="clip-actions-footer">
+          <button class="btn ${isRank1 ? 'btn-amber' : 'btn-military'}" style="width:100%; justify-content:center; font-size:0.8rem; padding:8px;" onclick="openShareModal()">
+            ${svgIcon('plus')} Postular Clip para Puesto #${rank}
+          </button>
+        </div>
+      </div>
+    </article>
+  `;
+}
+
 function renderLeaderSpotlight() {
+  const box = document.getElementById('leaderSpotlightBox');
+  if (!box) return;
+
   const sorted = [...clipsData].sort((a, b) => b.votes - a.votes);
   const leader = sorted[0];
-  const box = document.getElementById('leaderSpotlightBox');
-  if (!leader || !box) return;
 
-  const ytId = leader.youtubeId || extractYouTubeId(leader.videoUrl) || 'M7lc1UVf-VE';
+  if (!leader) {
+    const weekNum = weeklyConfig?.weekNumber || 42;
+    box.innerHTML = `
+      <div>
+        <div class="leader-crown" style="border-color:var(--olive-bright); color:var(--amber-command); background:rgba(224,159,45,0.12);">
+          ${svgIcon('shield')} DESPACHO // TRONO DEL LÍDER DISPONIBLE (SEMANA #${weekNum})
+        </div>
+        <div class="leader-preview-box">
+          <iframe src="https://www.youtube.com/embed/LjSxf4RctNg?rel=0" allowfullscreen loading="lazy"></iframe>
+        </div>
+        <h4 style="font-family:var(--font-heading); font-size:1.1rem; margin-bottom:6px; color:#fff;">
+          Hell Let Loose: Trono del Líder Disponible
+        </h4>
+        <div style="font-size:0.82rem; color:var(--paper-muted); margin-bottom:10px; line-height:1.4;">
+          El frente de clips acaba de abrirse. Aún no se han registrado jugadas esta semana. Sé el primer soldado en publicar tu clip de YouTube y reclamar la cima.
+        </div>
+      </div>
+      <div class="leader-stats-row">
+        <span class="tag-pill" style="background:rgba(224,159,45,0.15); border-color:var(--olive-bright); color:var(--amber-command); font-size:0.85rem;">
+          ${svgIcon('medal')} 0 VOTOS // PUESTO ABIERTO
+        </span>
+        <button class="btn btn-amber" style="padding:6px 14px; font-size:0.82rem;" onclick="openShareModal()">
+          ${svgIcon('plus')} Publicar Mi Jugada
+        </button>
+      </div>
+    `;
+    return;
+  }
+
+  const ytId = leader.youtubeId || extractYouTubeId(leader.videoUrl) || 'LjSxf4RctNg';
   const mediaHtml = `<iframe src="https://www.youtube.com/embed/${ytId}?rel=0" allowfullscreen loading="lazy"></iframe>`;
 
   const actionBtn = isModeratorLoggedIn()
@@ -802,6 +894,16 @@ function renderLeaderSpotlight() {
   `;
 }
 
+function resetFilters() {
+  const fMap = document.getElementById('filterMap');
+  const fRole = document.getElementById('filterRole');
+  const fFaction = document.getElementById('filterFaction');
+  if (fMap) fMap.value = 'ALL';
+  if (fRole) fRole.value = 'ALL';
+  if (fFaction) fFaction.value = 'ALL';
+  renderClips();
+}
+
 function renderClips() {
   renderLeaderSpotlight();
 
@@ -824,13 +926,36 @@ function renderClips() {
   }
 
   const grid = document.getElementById('clipsGrid');
-  grid.innerHTML = filtered.map((clip, idx) => {
+  if (!grid) return;
+
+  const hasFilterActive = mapFilter !== 'ALL' || roleFilter !== 'ALL' || factionFilter !== 'ALL';
+
+  if (filtered.length === 0) {
+    if (hasFilterActive) {
+      grid.innerHTML = `
+        <div style="grid-column: 1 / -1; background:rgba(0,0,0,0.4); border:1px dashed var(--olive-bright); border-radius:6px; padding:36px 20px; text-align:center;">
+          <p style="color:var(--paper-muted); font-size:0.95rem; margin-bottom:14px;">
+            No se encontraron jugadas en este frente con los filtros actuales.
+          </p>
+          <button class="btn btn-military" onclick="resetFilters()">
+            ${svgIcon('map')} Ver Todos los Frentes
+          </button>
+        </div>
+      `;
+      return;
+    }
+
+    // Portal a cero: Renderizamos los 3 puestos vacantes del podio
+    grid.innerHTML = renderVacantSlotCard(1) + renderVacantSlotCard(2) + renderVacantSlotCard(3);
+    return;
+  }
+
+  let realClipsHtml = filtered.map((clip, idx) => {
     const isRank1 = idx === 0 && sortOrder === 'votes';
     const voted = isVotedByCurrentUser(clip);
-    const ytId = clip.youtubeId || extractYouTubeId(clip.videoUrl) || 'M7lc1UVf-VE';
+    const ytId = clip.youtubeId || extractYouTubeId(clip.videoUrl) || 'LjSxf4RctNg';
     const mediaEmbed = `<iframe src="https://www.youtube.com/embed/${ytId}?rel=0" allowfullscreen loading="lazy"></iframe>`;
 
-    // El botón de extracción a 9:16 solo es visible si el moderador inició sesión
     const modBtnHtml = isModeratorLoggedIn()
       ? `<button class="btn-to-tiktok" onclick="loadClipIntoStudioById('${clip.id}')" title="Uso interno moderador: Extraer al Estudio 9:16">
            ${svgIcon('film')} 9:16
@@ -877,6 +1002,15 @@ function renderClips() {
       </article>
     `;
   }).join('');
+
+  // Si hay 1 o 2 clips cargados y no hay filtro activo, rellenamos los puestos restantes del podio
+  if (!hasFilterActive && filtered.length === 1) {
+    realClipsHtml += renderVacantSlotCard(2) + renderVacantSlotCard(3);
+  } else if (!hasFilterActive && filtered.length === 2) {
+    realClipsHtml += renderVacantSlotCard(3);
+  }
+
+  grid.innerHTML = realClipsHtml;
 }
 
 async function toggleVote(clipId) {
@@ -1306,6 +1440,27 @@ function renderHallOfFame() {
   const badge = document.getElementById('hallCountBadge');
   if (badge) badge.textContent = String(hallOfFameWinners.length);
   if (!grid) return;
+
+  if (!hallOfFameWinners.length) {
+    grid.innerHTML = `
+      <div style="grid-column: 1 / -1; background:rgba(18, 22, 16, 0.75); border:1px dashed var(--olive-bright); border-radius:8px; padding:48px 24px; text-align:center;">
+        <div style="display:flex; justify-content:center; margin-bottom:14px; color:var(--amber-command);">
+          <svg class="svg-icon" style="width:48px; height:48px;" viewBox="0 0 24 24"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.45 1-1 1H7c-.55 0-1-.45-1-1v-2.34"/><path d="M14 14.66V17c0 .55.45 1 1 1h2c.55 0 1-.45 1-1v-2.34"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/></svg>
+        </div>
+        <h3 style="font-family:var(--font-heading); color:#fff; font-size:1.35rem; margin-bottom:8px;">
+          ARCHIVO HISTÓRICO // PRIMERA TEMPORADA EN CURSO
+        </h3>
+        <p style="font-size:0.9rem; color:var(--paper-muted); max-width:560px; margin:0 auto 20px auto; line-height:1.6;">
+          ¡El Búnker ha abierto oficialmente sus puertas! Aún no hay jugadas condecoradas en el Salón de los Héroes.
+          El primer campeón de la historia se consagrará este Domingo a las 20:00 HS tras el cierre del escrutinio semanal.
+        </p>
+        <button class="btn btn-amber" style="padding:10px 20px; font-size:0.85rem;" onclick="switchView('feed'); openShareModal();">
+          ${svgIcon('plus')} Postular Mi Jugada para la Condecoración
+        </button>
+      </div>
+    `;
+    return;
+  }
 
   grid.innerHTML = hallOfFameWinners.map(w => {
     const ytId = w.youtubeId || extractYouTubeId(w.videoUrl);

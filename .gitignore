@@ -4,4 +4,5 @@ node_modules/
 exports/
 bin/
 *.log
+*.backup.json
 .DS_Store

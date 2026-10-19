@@ -740,6 +740,52 @@ body::before {
   color: var(--paper-muted);
 }
 
+/* Tarjetas de Podio Vacante (Puestos Disponibles) */
+.clip-card.vacant-slot {
+  border: 1px dashed var(--olive-bright);
+  background: rgba(18, 22, 16, 0.75);
+}
+
+.clip-card.vacant-slot.rank-1 {
+  border: 2px dashed var(--amber-command);
+}
+
+.vacant-slot-media {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: radial-gradient(circle at center, rgba(32, 40, 26, 0.85) 0%, rgba(10, 12, 9, 0.95) 100%);
+  border-bottom: 1px solid var(--steel-border);
+  color: var(--paper-muted);
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.vacant-slot-media:hover {
+  background: radial-gradient(circle at center, rgba(45, 56, 36, 0.95) 0%, rgba(14, 17, 12, 0.98) 100%);
+}
+
+.vacant-slot-icon {
+  width: 44px;
+  height: 44px;
+  color: var(--olive-bright);
+}
+
+.clip-card.vacant-slot.rank-1 .vacant-slot-icon {
+  color: var(--amber-command);
+}
+
+.vacant-slot-status {
+  font-family: var(--font-stencil);
+  font-size: 0.82rem;
+  letter-spacing: 1px;
+  color: var(--paper-aged);
+}
+
 .clip-media-wrapper {
   position: relative;
   width: 100%;
