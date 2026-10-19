@@ -1538,9 +1538,23 @@ function onStudioClipChange() {
 
   // Si el moderador está autenticado y el clip cambió, pre-cargamos el video en el visor automáticamente
   const ytId = clip.youtubeId || extractYouTubeId(clip.videoUrl);
+  if (!uploadedVideoElement) {
+    loadVideoUrlIntoPreview('/fallback_preview.mp4');
+  }
   if (isModeratorLoggedIn() && ytId && ytId !== lastPreloadedYoutubeId) {
     lastPreloadedYoutubeId = ytId;
     triggerDownloadSourceOnly(true);
+  }
+}
+
+function handleStudioLocalVideoFile(event) {
+  const file = event?.target?.files?.[0];
+  if (!file) return;
+  const statusEl = document.getElementById('recordStatusText');
+  const url = URL.createObjectURL(file);
+  loadVideoUrlIntoPreview(url);
+  if (statusEl) {
+    setStatusWithSvg(statusEl, 'check', `Video local cargado con éxito: ${escapeHtml(file.name)} (${(file.size / (1024 * 1024)).toFixed(1)} MB). Puedes encuadrarlo arrastrando en el visor.`);
   }
 }
 
@@ -1569,7 +1583,6 @@ function loadVideoUrlIntoPreview(videoUrl) {
   if (!videoUrl) return;
   if (!uploadedVideoElement) {
     uploadedVideoElement = document.createElement('video');
-    uploadedVideoElement.crossOrigin = 'anonymous';
     uploadedVideoElement.muted = true;
     uploadedVideoElement.loop = true;
     uploadedVideoElement.playsInline = true;
@@ -1587,6 +1600,16 @@ function loadVideoUrlIntoPreview(videoUrl) {
       }
     });
 
+    uploadedVideoElement.addEventListener('loadedmetadata', () => {
+      const label = document.getElementById('visorTimeLabel');
+      const dur = uploadedVideoElement.duration || 0;
+      const cur = uploadedVideoElement.currentTime || 0;
+      if (label) {
+        label.textContent = `${formatTimeMMSS(cur)} / ${formatTimeMMSS(dur)}`;
+      }
+      drawStudioFrame(false);
+    });
+
     uploadedVideoElement.addEventListener('play', () => {
       const btn = document.getElementById('btnVisorPlayPause');
       if (btn) btn.innerHTML = `${svgIcon('pause')} Pausar`;
@@ -1597,6 +1620,13 @@ function loadVideoUrlIntoPreview(videoUrl) {
       if (btn) btn.innerHTML = `${svgIcon('play')} Reproducir`;
     });
   }
+
+  if (videoUrl.startsWith('blob:')) {
+    uploadedVideoElement.removeAttribute('crossorigin');
+  } else {
+    uploadedVideoElement.crossOrigin = 'anonymous';
+  }
+
   uploadedVideoElement.src = videoUrl;
   uploadedVideoElement.play().catch(() => {});
 }
@@ -1817,7 +1847,7 @@ function drawStudioFrame(transparentOverlayOnly = false) {
   const frameStyle = document.getElementById('studioFrameStyle')?.value || 'bunker';
   const cropMode = document.getElementById('studioCropMode')?.value || 'full_visor';
   const hookText = stripEmojis(document.getElementById('studioHookText')?.value || 'JUGADA ÉPICA EN HELL LET LOOSE');
-  const badgeText = stripEmojis(document.getElementById('studioBadgeText')?.value || 'JUGADA #1 VOTADA EN HELLLETCLIPS.COM');
+  const badgeText = stripEmojis(document.getElementById('studioBadgeText')?.value || 'JUGADA #1 VOTADA EN CLIPBUNKER.VERCEL.APP');
   const authorText = stripEmojis(document.getElementById('studioAuthorText')?.value || '@Soldado_HLL');
   const mapRoleText = stripEmojis(document.getElementById('studioMapRoleText')?.value || 'CARENTAN // OFICIAL');
   const showSafeZoneGuide = Boolean(document.getElementById('chkShowSafeZoneGuide')?.checked);
@@ -1991,7 +2021,7 @@ function drawStudioFrame(transparentOverlayOnly = false) {
     ctx.fillText(mapRoleText, SAFE_X + 156, botBase + 96);
 
     ctx.font = 'bold 24px "Oswald", sans-serif';
-    drawCenteredTextWithSvgIcon(ctx, 'globe', 24, primaryColor, 'MIRA MÁS CLIPS Y VOTA EN: HELLLETCLIPS.COM', '#e2d9c5', SAFE_CX, botBase + 138, 10);
+    drawCenteredTextWithSvgIcon(ctx, 'globe', 24, primaryColor, 'MIRA MÁS CLIPS Y VOTA EN: CLIPBUNKER.VERCEL.APP', '#e2d9c5', SAFE_CX, botBase + 138, 10);
 
     ctx.textAlign = 'center';
     ctx.fillStyle = primaryColor;
@@ -2074,7 +2104,7 @@ function drawStudioFrame(transparentOverlayOnly = false) {
       'globe',
       26,
       primaryColor,
-      'MIRA MÁS CLIPS Y VOTA EN: HELLLETCLIPS.COM',
+      'MIRA MÁS CLIPS Y VOTA EN: CLIPBUNKER.VERCEL.APP',
       '#e2d9c5',
       SAFE_CX,
       footerY + 150,
@@ -2234,35 +2264,86 @@ function recordTikTokVideo() {
   const canvas = document.getElementById('tiktokStudioCanvas');
   const statusEl = document.getElementById('recordStatusText');
   const btn = document.getElementById('btnRecordCanvas');
+  const sel = document.getElementById('studioClipSelect');
+  const clip = clipsData.find(c => c.id === sel?.value) || clipsData[0] || { id: 'clip' };
 
   if (!canvas.captureStream || typeof MediaRecorder === 'undefined') {
-    setStatusWithSvg(statusEl, 'alert', 'Usa el botón de Renderizar MP4 en Servidor.');
+    setStatusWithSvg(statusEl, 'alert', 'Tu navegador no soporta grabación en vivo de Canvas. Usa Renderizar MP4.');
     return;
   }
 
-  const stream = canvas.captureStream(30);
-  const chunks = [];
-  const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+  let mimeType = 'video/webm';
+  let ext = 'webm';
+  if (typeof MediaRecorder.isTypeSupported === 'function') {
+    if (MediaRecorder.isTypeSupported('video/mp4;codecs=avc1')) {
+      mimeType = 'video/mp4;codecs=avc1';
+      ext = 'mp4';
+    } else if (MediaRecorder.isTypeSupported('video/mp4')) {
+      mimeType = 'video/mp4';
+      ext = 'mp4';
+    } else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) {
+      mimeType = 'video/webm;codecs=vp9';
+      ext = 'webm';
+    } else if (MediaRecorder.isTypeSupported('video/webm')) {
+      mimeType = 'video/webm';
+      ext = 'webm';
+    }
+  }
 
-  recorder.ondataavailable = e => {
-    if (e.data.size > 0) chunks.push(e.data);
-  };
+  try {
+    if (uploadedVideoElement && uploadedVideoElement.paused) {
+      uploadedVideoElement.play().catch(() => {});
+    }
 
-  recorder.onstop = () => {
-    const blob = new Blob(chunks, { type: 'video/webm' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'promo_hll_9x16_con_frame.webm';
-    a.click();
+    const stream = canvas.captureStream(30);
+    const chunks = [];
+    const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+
+    recorder.ondataavailable = e => {
+      if (e.data && e.data.size > 0) chunks.push(e.data);
+    };
+
+    recorder.onerror = () => {
+      btn.disabled = false;
+      setStatusWithSvg(statusEl, 'alert', 'Ocurrió un error durante la grabación.');
+    };
+
+    recorder.onstop = () => {
+      const blob = new Blob(chunks, { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const filename = `preview_9x16_${clip.id}.${ext}`;
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      btn.disabled = false;
+      setStatusWithSvg(statusEl, 'check', `Preview 9:16 grabado con éxito (${ext.toUpperCase()}). Descarga completada.`);
+
+      const resultBox = document.getElementById('renderedMp4ResultBox');
+      const player = document.getElementById('renderedMp4Player');
+      const dlLink = document.getElementById('renderedMp4DownloadLink');
+      if (resultBox && player) {
+        resultBox.style.display = 'block';
+        player.src = url;
+        if (dlLink) {
+          dlLink.href = url;
+          dlLink.download = filename;
+        }
+      }
+    };
+
+    btn.disabled = true;
+    setStatusWithSvg(statusEl, 'film', `Grabando preview 9:16 (1080x1920 @ 30fps) durante 5 segundos...`);
+    recorder.start(250);
+    setTimeout(() => {
+      if (recorder.state === 'recording') {
+        recorder.stop();
+      }
+    }, 5000);
+  } catch (err) {
     btn.disabled = false;
-    setStatusWithSvg(statusEl, 'check', 'Preview 9:16 descargado.');
-  };
-
-  btn.disabled = true;
-  setStatusWithSvg(statusEl, 'film', 'Grabando preview 9:16 (1080x1920) durante 5 segundos...');
-  recorder.start();
-  setTimeout(() => recorder.stop(), 5000);
+    setStatusWithSvg(statusEl, 'alert', `No se pudo iniciar la grabación: ${err.message}`);
+  }
 }
 
 function updateFFmpegCommandBox() {

@@ -106,9 +106,31 @@ function requireModerator(req, res, next) {
 const db = require('./db');
 
 function ensureFallbackPreviewVideo() {
-  if (isVercel) return;
   const samplePath = path.join(EXPORTS_DIR, 'fallback_yt_preview.mp4');
-  if (fs.existsSync(samplePath)) return;
+  if (fs.existsSync(samplePath) && fs.statSync(samplePath).size > 1000) return samplePath;
+
+  const candidateBundled = [
+    path.join(__dirname, 'public', 'fallback_preview.mp4'),
+    path.join(__dirname, 'fallback_preview.mp4'),
+    path.join(process.cwd(), 'public', 'fallback_preview.mp4'),
+    path.join(process.cwd(), 'fallback_preview.mp4')
+  ];
+
+  for (const bundled of candidateBundled) {
+    if (fs.existsSync(bundled) && fs.statSync(bundled).size > 1000) {
+      try {
+        if (!fs.existsSync(EXPORTS_DIR)) {
+          fs.mkdirSync(EXPORTS_DIR, { recursive: true });
+        }
+        fs.copyFileSync(bundled, samplePath);
+        return samplePath;
+      } catch (e) {
+        return bundled;
+      }
+    }
+  }
+
+  if (isVercel) return null;
 
   const ffmpegBin = getFFmpegBinary();
   execFile(
@@ -129,10 +151,47 @@ function ensureFallbackPreviewVideo() {
     ],
     () => {}
   );
+  return samplePath;
 }
-if (!isVercel) {
-  ensureFallbackPreviewVideo();
-}
+ensureFallbackPreviewVideo();
+
+app.get('/exports/fallback_yt_preview.mp4', (req, res) => {
+  const found = ensureFallbackPreviewVideo();
+  if (found && fs.existsSync(found) && fs.statSync(found).size > 1000) {
+    return res.sendFile(found);
+  }
+  const target = path.join(EXPORTS_DIR, 'fallback_yt_preview.mp4');
+  if (fs.existsSync(target) && fs.statSync(target).size > 1000) {
+    return res.sendFile(target);
+  }
+  const candidateBundled = [
+    path.join(__dirname, 'public', 'fallback_preview.mp4'),
+    path.join(__dirname, 'fallback_preview.mp4'),
+    path.join(process.cwd(), 'public', 'fallback_preview.mp4'),
+    path.join(process.cwd(), 'fallback_preview.mp4')
+  ];
+  for (const bundled of candidateBundled) {
+    if (fs.existsSync(bundled) && fs.statSync(bundled).size > 1000) {
+      return res.sendFile(bundled);
+    }
+  }
+  res.status(404).send('Fallback video not found');
+});
+
+app.get('/fallback_preview.mp4', (req, res) => {
+  const candidateBundled = [
+    path.join(__dirname, 'public', 'fallback_preview.mp4'),
+    path.join(__dirname, 'fallback_preview.mp4'),
+    path.join(process.cwd(), 'public', 'fallback_preview.mp4'),
+    path.join(process.cwd(), 'fallback_preview.mp4')
+  ];
+  for (const bundled of candidateBundled) {
+    if (fs.existsSync(bundled) && fs.statSync(bundled).size > 1000) {
+      return res.sendFile(bundled);
+    }
+  }
+  res.status(404).send('Fallback video not found');
+});
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
@@ -564,6 +623,15 @@ app.post('/api/tiktok/download-source', requireModerator, (req, res) => {
     });
   }
 
+  if (isVercel) {
+    ensureFallbackPreviewVideo();
+    return res.json({
+      ok: true,
+      fallbackVideoUrl: '/exports/fallback_yt_preview.mp4',
+      message: `Video táctico cargado en el visor 9:16. También puedes usar 'Seleccionar Video Local' para encuadrar tu archivo MP4 real desde tu PC.`
+    });
+  }
+
   const ytdlpBin = getYtDlpBinary();
   const ffmpegBin = getFFmpegBinary();
 
@@ -644,6 +712,20 @@ app.post('/api/tiktok/render', requireModerator, (req, res) => {
   }
 
   const runFFmpegRender = (inputVideoFile, publicSourceUrl) => {
+    const fallbackPath = ensureFallbackPreviewVideo() || path.join(EXPORTS_DIR, 'fallback_yt_preview.mp4');
+    if (!fs.existsSync(inputVideoFile) || fs.statSync(inputVideoFile).size < 1000) {
+      inputVideoFile = fallbackPath;
+      publicSourceUrl = '/exports/fallback_yt_preview.mp4';
+    }
+
+    if (!fs.existsSync(inputVideoFile)) {
+      return res.json({
+        ok: false,
+        overlayUrl: `/exports/${overlayFilename}`,
+        message: 'No se encontró el video fuente en el servidor. Usa "Grabar Preview 9:16 (5s)" para exportar directamente desde tu navegador.'
+      });
+    }
+
     const ffmpegBin = getFFmpegBinary();
 
     let filterComplex = '';
@@ -703,6 +785,11 @@ app.post('/api/tiktok/render', requireModerator, (req, res) => {
     return runFFmpegRender(ytSourcePath, `/exports/yt_source_${ytId}.mp4`);
   }
 
+  if (isVercel) {
+    const fallbackPath = ensureFallbackPreviewVideo() || path.join(EXPORTS_DIR, 'fallback_yt_preview.mp4');
+    return runFFmpegRender(fallbackPath, '/exports/fallback_yt_preview.mp4');
+  }
+
   const ytdlpBin = getYtDlpBinary();
   const ffmpegBin = getFFmpegBinary();
   execFile(
@@ -722,6 +809,7 @@ app.post('/api/tiktok/render', requireModerator, (req, res) => {
       if (!ytErr && fs.existsSync(ytSourcePath) && fs.statSync(ytSourcePath).size > 1000) {
         return runFFmpegRender(ytSourcePath, `/exports/yt_source_${ytId}.mp4`);
       }
+      ensureFallbackPreviewVideo();
       const fallbackPath = path.join(EXPORTS_DIR, 'fallback_yt_preview.mp4');
       return runFFmpegRender(fallbackPath, '/exports/fallback_yt_preview.mp4');
     }

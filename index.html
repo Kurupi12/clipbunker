@@ -541,6 +541,21 @@
               </select>
             </div>
 
+            <div style="grid-column: 1 / -1; margin-top:-6px; margin-bottom:10px; background:rgba(0,0,0,0.35); border:1px dashed var(--olive-bright); border-radius:6px; padding:10px 14px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+              <div style="font-size:0.8rem; color:var(--paper-muted); line-height:1.3;">
+                <strong style="color:var(--amber-command); display:block; margin-bottom:2px;">
+                  <svg class="svg-icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                  Cargar Video MP4 del Clip (Desde tu PC):
+                </strong>
+                Carga el archivo de video de tu jugada directamente desde tu PC para previsualizarlo y encuadrarlo a 60 FPS en el visor.
+              </div>
+              <label class="btn btn-amber" style="font-size:0.78rem; padding:6px 14px; cursor:pointer; flex-shrink:0;">
+                <svg class="svg-icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                Seleccionar Video Local
+                <input type="file" id="studioLocalVideoFile" accept="video/mp4,video/webm,video/quicktime" style="display:none;" onchange="handleStudioLocalVideoFile(event)" />
+              </label>
+            </div>
+
             <div class="form-field">
               <label>2. Diseño del Marco / Frame WWII:</label>
               <select id="studioFrameStyle" class="tactical-select" onchange="drawStudioFrame()">
@@ -656,7 +671,7 @@
 
             <div class="form-field">
               <label>5. Insignia Superior del Marco (Con Trofeo SVG):</label>
-              <input type="text" id="studioBadgeText" class="tactical-input" value="JUGADA #1 VOTADA EN HELLLETCLIPS.COM" oninput="drawStudioFrame()" />
+              <input type="text" id="studioBadgeText" class="tactical-input" value="JUGADA #1 VOTADA EN CLIPBUNKER.VERCEL.APP" oninput="drawStudioFrame()" />
             </div>
 
             <div class="form-field">
