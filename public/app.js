@@ -351,11 +351,17 @@ function renderModeratorAuthUI() {
 }
 
 function openModeratorModal() {
-  document.getElementById('modLoginError').textContent = '';
+  const input = document.getElementById('modSecretKeyInput');
+  if (input) input.value = '';
+  const errEl = document.getElementById('modLoginError');
+  if (errEl) errEl.textContent = '';
   document.getElementById('moderatorModal').classList.add('open');
+  if (input) setTimeout(() => input.focus(), 100);
 }
 
 function closeModeratorModal() {
+  const input = document.getElementById('modSecretKeyInput');
+  if (input) input.value = '';
   document.getElementById('moderatorModal').classList.remove('open');
 }
 

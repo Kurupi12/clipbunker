@@ -1005,7 +1005,7 @@
             </div>
             <div class="form-field">
               <label>Clan o División HLL:</label>
-              <input type="text" id="regClan" class="tactical-input" placeholder="[MiClan] o Recluta" value="Recluta" />
+              <input type="text" id="regClan" class="tactical-input" placeholder="[MiClan] o Recluta" />
             </div>
           </div>
           <div class="form-field">
@@ -1071,12 +1071,12 @@
             <form onsubmit="handleFastDiscordLogin(event)">
               <div class="form-field">
                 <label>Tu Tag de Discord (ej: @Soldado#1944):</label>
-                <input type="text" id="fastDiscordTag" class="tactical-input" required placeholder="@Soldado#1944" value="Santiago_Cmdr#1944" />
+                <input type="text" id="fastDiscordTag" class="tactical-input" required placeholder="@Soldado#1944" />
               </div>
               <div class="control-grid">
                 <div class="form-field">
                   <label>Clan:</label>
-                  <input type="text" id="fastDiscordClan" class="tactical-input" value="[501st] División Blindada" />
+                  <input type="text" id="fastDiscordClan" class="tactical-input" placeholder="[MiClan] o Recluta" />
                 </div>
                 <div class="form-field">
                   <label>Rol:</label>
@@ -1119,7 +1119,7 @@
       <form onsubmit="handleModeratorLogin(event)">
         <div class="form-field">
           <label>Clave de Moderación:</label>
-          <input type="password" id="modSecretKeyInput" class="tactical-input" value="HLL-MOD-1944" required />
+          <input type="password" id="modSecretKeyInput" class="tactical-input" placeholder="Introduce la clave de acceso..." autocomplete="current-password" required />
         </div>
 
         <p id="modLoginError" style="color:var(--crimson-war); font-size:0.82rem; margin-bottom:8px;"></p>
