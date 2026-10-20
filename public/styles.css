@@ -1008,11 +1008,43 @@ body::before {
   touch-action: none;
 }
 
+.studio-youtube-layer {
+  position: absolute;
+  left: 33.33px;
+  top: 106.67px;
+  width: 260px;
+  height: 346.67px;
+  z-index: 1;
+  background: #000;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: top 0.2s ease, height 0.2s ease;
+}
+
+.studio-youtube-layer.safe_full_1320 {
+  top: 50px;
+  height: 473.33px;
+}
+
+.studio-youtube-layer iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+}
+
 #tiktokStudioCanvas {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
   display: block;
+  z-index: 2;
   cursor: grab;
+  pointer-events: none;
 }
 
 #tiktokStudioCanvas.dragging {

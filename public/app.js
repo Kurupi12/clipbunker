@@ -1522,6 +1522,76 @@ function getStudioVisorBox(cropMode) {
   return { x: 100, y: 320, w: 780, h: 1040 };
 }
 
+function onCropModeChange() {
+  const cropMode = document.getElementById('studioCropMode')?.value || 'full_visor';
+  const ytWrapper = document.getElementById('studioYoutubeWrapper');
+  if (ytWrapper) {
+    if (cropMode === 'safe_full_1320') {
+      ytWrapper.classList.add('safe_full_1320');
+    } else {
+      ytWrapper.classList.remove('safe_full_1320');
+    }
+  }
+  drawStudioFrame(false);
+  updateFFmpegCommandBox();
+}
+
+let isStudioYoutubeActive = true;
+
+function loadStudioYouTubeVideo(youtubeId) {
+  if (!youtubeId) return;
+  isStudioYoutubeActive = true;
+  const iframe = document.getElementById('studioYoutubeIframe');
+  const ytWrapper = document.getElementById('studioYoutubeWrapper');
+  const cropMode = document.getElementById('studioCropMode')?.value || 'full_visor';
+
+  if (ytWrapper) {
+    ytWrapper.style.display = 'block';
+    if (cropMode === 'safe_full_1320') {
+      ytWrapper.classList.add('safe_full_1320');
+    } else {
+      ytWrapper.classList.remove('safe_full_1320');
+    }
+  }
+
+  if (iframe) {
+    const embedUrl = `https://www.youtube-nocookie.com/embed/${youtubeId}?autoplay=1&mute=0&controls=1&rel=0&playsinline=1`;
+    if (iframe.src !== embedUrl) {
+      iframe.src = embedUrl;
+    }
+  }
+
+  const canvas = document.getElementById('tiktokStudioCanvas');
+  if (canvas) {
+    canvas.style.pointerEvents = 'none';
+  }
+
+  const badge = document.getElementById('studioVideoSourceBadge');
+  if (badge) {
+    badge.innerHTML = `<svg class="svg-icon" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg> FUENTE: YOUTUBE DIRECTO`;
+    badge.style.color = '#ff4d4d';
+    badge.style.borderColor = '#ff4d4d';
+  }
+
+  const hintText = document.getElementById('visorDragHintText');
+  if (hintText) {
+    hintText.innerHTML = `<strong>Video de YouTube en vivo</strong> dentro del visor táctico 9:16`;
+  }
+
+  drawStudioFrame(false);
+}
+
+function reloadStudioYoutube() {
+  const sel = document.getElementById('studioClipSelect');
+  const clip = clipsData.find(c => c.id === sel?.value) || clipsData[0];
+  const ytId = clip?.youtubeId || extractYouTubeId(clip?.videoUrl);
+  if (ytId) {
+    loadStudioYouTubeVideo(ytId);
+    const statusEl = document.getElementById('recordStatusText');
+    if (statusEl) setStatusWithSvg(statusEl, 'check', `Clip de YouTube recargado: https://youtu.be/${ytId}`);
+  }
+}
+
 function onStudioClipChange() {
   const sel = document.getElementById('studioClipSelect');
   if (!sel) return;
@@ -1536,11 +1606,13 @@ function onStudioClipChange() {
   if (mapRoleEl) mapRoleEl.value = `${clip.map.toUpperCase()} // ${clip.role.toUpperCase()}`;
   updateFFmpegCommandBox();
 
-  // Si el moderador está autenticado y el clip cambió, pre-cargamos el video en el visor automáticamente
   const ytId = clip.youtubeId || extractYouTubeId(clip.videoUrl);
-  if (!uploadedVideoElement) {
+  if (ytId) {
+    loadStudioYouTubeVideo(ytId);
+  } else if (!uploadedVideoElement) {
     loadVideoUrlIntoPreview('/fallback_preview.mp4');
   }
+
   if (isModeratorLoggedIn() && ytId && ytId !== lastPreloadedYoutubeId) {
     lastPreloadedYoutubeId = ytId;
     triggerDownloadSourceOnly(true);
@@ -1550,6 +1622,30 @@ function onStudioClipChange() {
 function handleStudioLocalVideoFile(event) {
   const file = event?.target?.files?.[0];
   if (!file) return;
+
+  isStudioYoutubeActive = false;
+  const ytWrapper = document.getElementById('studioYoutubeWrapper');
+  const iframe = document.getElementById('studioYoutubeIframe');
+  if (ytWrapper) ytWrapper.style.display = 'none';
+  if (iframe) iframe.src = '';
+
+  const canvas = document.getElementById('tiktokStudioCanvas');
+  if (canvas) {
+    canvas.style.pointerEvents = 'auto';
+  }
+
+  const badge = document.getElementById('studioVideoSourceBadge');
+  if (badge) {
+    badge.innerHTML = `<svg class="svg-icon" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/></svg> ARCHIVO LOCAL: ${escapeHtml(file.name.slice(0, 22))}`;
+    badge.style.color = 'var(--amber-command)';
+    badge.style.borderColor = 'var(--amber-command)';
+  }
+
+  const hintText = document.getElementById('visorDragHintText');
+  if (hintText) {
+    hintText.innerHTML = `<strong>Arrastra con el mouse dentro del visor</strong> para mover y encuadrar (Rueda = Zoom)`;
+  }
+
   const statusEl = document.getElementById('recordStatusText');
   const url = URL.createObjectURL(file);
   loadVideoUrlIntoPreview(url);
@@ -1750,6 +1846,14 @@ function syncFramingUIFromState() {
   if (labelZoom) {
     labelZoom.textContent = `${studioZoom.toFixed(2)}x`;
   }
+
+  const ytIframe = document.getElementById('studioYoutubeIframe');
+  if (ytIframe && isStudioYoutubeActive) {
+    const shiftX = (0.5 - studioPanX) * 40 * (studioZoom - 1);
+    const shiftY = (0.5 - studioPanY) * 40 * (studioZoom - 1);
+    ytIframe.style.transform = `scale(${studioZoom}) translate(${shiftX}px, ${shiftY}px)`;
+    ytIframe.style.transformOrigin = 'center center';
+  }
 }
 
 function onFramingSliderChange(isVerticalSlider = false) {
@@ -1882,73 +1986,79 @@ function drawStudioFrame(transparentOverlayOnly = false) {
     ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, W, H);
 
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(boxX, videoBoxY, boxW, videoBoxH);
-    ctx.clip();
-
-    if (uploadedVideoElement && uploadedVideoElement.readyState >= 2) {
-      const vw = uploadedVideoElement.videoWidth || 1280;
-      const vh = uploadedVideoElement.videoHeight || 720;
-
-      if (cropMode === 'blur_bg') {
-        ctx.filter = 'blur(18px) brightness(0.45)';
-        ctx.drawImage(uploadedVideoElement, boxX - 40, videoBoxY - 40, boxW + 80, videoBoxH + 80);
-        ctx.filter = 'none';
-        const vidW = boxW * studioZoom;
-        const vidH = vidW * (vh / vw);
-        const drawX = boxX - (vidW - boxW) * studioPanX;
-        const drawY = videoBoxY + (videoBoxH - vidH) * studioPanY;
-        ctx.drawImage(uploadedVideoElement, drawX, drawY, vidW, vidH);
-      } else {
-        // Recorte exacto al tamaño del visor en Zona Segura con desplazamiento X/Y/Zoom
-        const baseScale = Math.max(boxW / vw, videoBoxH / vh);
-        const scale = baseScale * studioZoom;
-        const drawW = vw * scale;
-        const drawH = vh * scale;
-        const maxOffsetX = Math.max(0, drawW - boxW);
-        const maxOffsetY = Math.max(0, drawH - videoBoxH);
-        const drawX = boxX - maxOffsetX * studioPanX;
-        const drawY = videoBoxY - maxOffsetY * studioPanY;
-        ctx.drawImage(uploadedVideoElement, drawX, drawY, drawW, drawH);
-      }
+    if (isStudioYoutubeActive) {
+      // En modo YouTube, el video real se reproduce detrás del lienzo en el iframe:
+      // dejamos el área del visor 100% transparente
+      ctx.clearRect(boxX, videoBoxY, boxW, videoBoxH);
     } else {
-      drawSimulatedCombatFeed(ctx, boxX, videoBoxY, boxW, videoBoxH, cropMode);
-    }
-
-    // Guía táctica de encuadre en vivo mientras el moderador arrastra el video en el visor
-    if (isDraggingVisor) {
-      ctx.strokeStyle = 'rgba(224, 159, 45, 0.8)';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([12, 8]);
+      ctx.save();
       ctx.beginPath();
-      ctx.moveTo(boxX + boxW / 2, videoBoxY);
-      ctx.lineTo(boxX + boxW / 2, videoBoxY + videoBoxH);
-      ctx.moveTo(boxX, videoBoxY + videoBoxH / 2);
-      ctx.lineTo(boxX + boxW, videoBoxY + videoBoxH / 2);
-      ctx.stroke();
-      ctx.setLineDash([]);
+      ctx.rect(boxX, videoBoxY, boxW, videoBoxH);
+      ctx.clip();
 
-      ctx.fillStyle = 'rgba(14, 16, 12, 0.88)';
-      ctx.fillRect(boxX + 90, videoBoxY + 24, boxW - 180, 50);
-      ctx.strokeStyle = '#e09f2d';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(boxX + 90, videoBoxY + 24, boxW - 180, 50);
-      ctx.font = 'bold 21px "Chakra Petch", monospace';
-      drawCenteredTextWithSvgIcon(
-        ctx,
-        'crosshair',
-        24,
-        '#e09f2d',
-        `VISOR ${boxW}×${videoBoxH} // X:${Math.round(studioPanX * 100)}% Y:${Math.round(studioPanY * 100)}% ZOOM:${studioZoom.toFixed(2)}x`,
-        '#e09f2d',
-        boxX + boxW / 2,
-        videoBoxY + 57,
-        8
-      );
+      if (uploadedVideoElement && uploadedVideoElement.readyState >= 2) {
+        const vw = uploadedVideoElement.videoWidth || 1280;
+        const vh = uploadedVideoElement.videoHeight || 720;
+
+        if (cropMode === 'blur_bg') {
+          ctx.filter = 'blur(18px) brightness(0.45)';
+          ctx.drawImage(uploadedVideoElement, boxX - 40, videoBoxY - 40, boxW + 80, videoBoxH + 80);
+          ctx.filter = 'none';
+          const vidW = boxW * studioZoom;
+          const vidH = vidW * (vh / vw);
+          const drawX = boxX - (vidW - boxW) * studioPanX;
+          const drawY = videoBoxY + (videoBoxH - vidH) * studioPanY;
+          ctx.drawImage(uploadedVideoElement, drawX, drawY, vidW, vidH);
+        } else {
+          // Recorte exacto al tamaño del visor en Zona Segura con desplazamiento X/Y/Zoom
+          const baseScale = Math.max(boxW / vw, videoBoxH / vh);
+          const scale = baseScale * studioZoom;
+          const drawW = vw * scale;
+          const drawH = vh * scale;
+          const maxOffsetX = Math.max(0, drawW - boxW);
+          const maxOffsetY = Math.max(0, drawH - videoBoxH);
+          const drawX = boxX - maxOffsetX * studioPanX;
+          const drawY = videoBoxY - maxOffsetY * studioPanY;
+          ctx.drawImage(uploadedVideoElement, drawX, drawY, drawW, drawH);
+        }
+      } else {
+        drawSimulatedCombatFeed(ctx, boxX, videoBoxY, boxW, videoBoxH, cropMode);
+      }
+
+      // Guía táctica de encuadre en vivo mientras el moderador arrastra el video en el visor
+      if (isDraggingVisor) {
+        ctx.strokeStyle = 'rgba(224, 159, 45, 0.8)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([12, 8]);
+        ctx.beginPath();
+        ctx.moveTo(boxX + boxW / 2, videoBoxY);
+        ctx.lineTo(boxX + boxW / 2, videoBoxY + videoBoxH);
+        ctx.moveTo(boxX, videoBoxY + videoBoxH / 2);
+        ctx.lineTo(boxX + boxW, videoBoxY + videoBoxH / 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.fillStyle = 'rgba(14, 16, 12, 0.88)';
+        ctx.fillRect(boxX + 90, videoBoxY + 24, boxW - 180, 50);
+        ctx.strokeStyle = '#e09f2d';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(boxX + 90, videoBoxY + 24, boxW - 180, 50);
+        ctx.font = 'bold 21px "Chakra Petch", monospace';
+        drawCenteredTextWithSvgIcon(
+          ctx,
+          'crosshair',
+          24,
+          '#e09f2d',
+          `VISOR ${boxW}×${videoBoxH} // X:${Math.round(studioPanX * 100)}% Y:${Math.round(studioPanY * 100)}% ZOOM:${studioZoom.toFixed(2)}x`,
+          '#e09f2d',
+          boxX + boxW / 2,
+          videoBoxY + 57,
+          8
+        );
+      }
+
+      ctx.restore();
     }
-
-    ctx.restore();
   }
 
   const primaryColor = frameStyle === 'bunker' ? '#e09f2d' : (frameStyle === 'tactical_map' ? '#76b852' : '#d94b38');
@@ -1958,6 +2068,12 @@ function drawStudioFrame(transparentOverlayOnly = false) {
   ctx.fillStyle = panelBg;
   ctx.fillRect(0, 0, W, videoBoxY);                                           // Arriba del visor
   ctx.fillRect(0, videoBoxY + videoBoxH, W, H - (videoBoxY + videoBoxH));     // Abajo del visor
+  ctx.fillRect(0, videoBoxY, boxX, videoBoxH);                                // Margen izquierdo (100 px)
+  ctx.fillRect(boxX + boxW, videoBoxY, W - (boxX + boxW), videoBoxH);         // Margen derecho (200 px)
+
+  if (isStudioYoutubeActive) {
+    ctx.clearRect(boxX, videoBoxY, boxW, videoBoxH);
+  }
   ctx.fillRect(0, videoBoxY, boxX, videoBoxH);                                // Margen izquierdo (100 px)
   ctx.fillRect(boxX + boxW, videoBoxY, W - (boxX + boxW), videoBoxH);         // Margen derecho (200 px)
 
@@ -2272,6 +2388,16 @@ function recordTikTokVideo() {
     return;
   }
 
+  if (isStudioYoutubeActive) {
+    setStatusWithSvg(
+      statusEl,
+      'check',
+      'El video actual se reproduce desde YouTube. Se ha descargado el Frame PNG 1080x1920 con visor transparente para CapCut/Premiere. Si deseas grabar el canvas, carga tu archivo con "Seleccionar Video Local".'
+    );
+    downloadOverlayPNG();
+    return;
+  }
+
   let mimeType = 'video/webm';
   let ext = 'webm';
   if (typeof MediaRecorder.isTypeSupported === 'function') {
@@ -2407,9 +2533,18 @@ async function triggerDownloadSourceOnly(isAutoPreload = false) {
     });
     const data = await res.json();
     if (statusEl) setStatusWithSvg(statusEl, data.ok ? 'check' : 'alert', data.message);
-    const videoToLoad = data.localVideoUrl || data.fallbackVideoUrl;
-    if (videoToLoad) {
-      loadVideoUrlIntoPreview(videoToLoad);
+    if (data.localVideoUrl) {
+      isStudioYoutubeActive = false;
+      const ytWrapper = document.getElementById('studioYoutubeWrapper');
+      if (ytWrapper) ytWrapper.style.display = 'none';
+      const canvas = document.getElementById('tiktokStudioCanvas');
+      if (canvas) canvas.style.pointerEvents = 'auto';
+      loadVideoUrlIntoPreview(data.localVideoUrl);
+    } else {
+      const ytId = clip.youtubeId || extractYouTubeId(clip.videoUrl);
+      if (ytId) {
+        loadStudioYouTubeVideo(ytId);
+      }
     }
   } catch (err) {
     if (statusEl) setStatusWithSvg(statusEl, 'alert', 'Error comunicando con el servidor backend.');

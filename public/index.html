@@ -461,13 +461,27 @@
             <span class="tag-pill" style="border-color:var(--amber-command); color:var(--amber-command);">ZONA SEGURA: 780×1040 PX</span>
           </div>
 
-          <div class="visor-drag-hint">
+          <div class="visor-drag-hint" id="visorDragHint">
             <svg class="svg-icon" viewBox="0 0 24 24"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
-            <strong>Arrastra con el mouse dentro del visor</strong> para mover y encuadrar el video (Rueda = Zoom)
+            <span id="visorDragHintText"><strong>Video de YouTube en vivo</strong> dentro del visor táctico 9:16</span>
           </div>
 
           <div class="studio-canvas-container" id="studioCanvasWrapper">
+            <!-- Capa con el reproductor real de YouTube embebido -->
+            <div id="studioYoutubeWrapper" class="studio-youtube-layer">
+              <iframe id="studioYoutubeIframe" src="" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+            </div>
             <canvas id="tiktokStudioCanvas" width="1080" height="1920"></canvas>
+          </div>
+
+          <!-- Indicador de fuente activa y botón para recargar -->
+          <div style="display:flex; justify-content:space-between; align-items:center; width:360px; max-width:100%; margin-top:6px; margin-bottom:4px;">
+            <span id="studioVideoSourceBadge" class="tag-pill" style="color:#ff4d4d; border-color:#ff4d4d; font-size:0.72rem;">
+              <svg class="svg-icon" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg> FUENTE: YOUTUBE DIRECTO
+            </span>
+            <button type="button" class="btn btn-military" style="font-size:0.72rem; padding:3px 10px;" onclick="reloadStudioYoutube()">
+              <svg class="svg-icon" viewBox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg> Recargar Video
+            </button>
           </div>
 
           <!-- Guía visual de márgenes de Zona Segura (solo vista previa) -->
@@ -567,7 +581,7 @@
 
             <div class="form-field">
               <label>3. Distribución dentro de la Zona Segura (X:100..880, Y:140..1570):</label>
-              <select id="studioCropMode" class="tactical-select" onchange="drawStudioFrame(); updateFFmpegCommandBox();">
+              <select id="studioCropMode" class="tactical-select" onchange="onCropModeChange()">
                 <option value="full_visor" selected>Zona Segura Calibrada (Visor 780×1040 en Y=320 + Encabezado + Autor)</option>
                 <option value="safe_full_1320">Visor Ocupando Toda la Zona Segura (780×1420 px Movible)</option>
                 <option value="blur_bg">Fondo Táctico Difuminado + Video 16:9</option>

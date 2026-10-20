@@ -624,11 +624,10 @@ app.post('/api/tiktok/download-source', requireModerator, (req, res) => {
   }
 
   if (isVercel) {
-    ensureFallbackPreviewVideo();
     return res.json({
       ok: true,
-      fallbackVideoUrl: '/exports/fallback_yt_preview.mp4',
-      message: `Video táctico cargado en el visor 9:16. También puedes usar 'Seleccionar Video Local' para encuadrar tu archivo MP4 real desde tu PC.`
+      youtubeId: ytId,
+      message: `Clip de YouTube (${ytId}) sincronizado en el visor 9:16.`
     });
   }
 
@@ -649,9 +648,9 @@ app.post('/api/tiktok/download-source', requireModerator, (req, res) => {
   execFile(ytdlpBin, args, { timeout: 120000 }, (err) => {
     if (err || !fs.existsSync(targetPath) || fs.statSync(targetPath).size < 1000) {
       return res.json({
-        ok: false,
-        fallbackVideoUrl: '/exports/fallback_yt_preview.mp4',
-        message: `No se pudo descargar directamente el ID (${ytId}). Se cargó el video táctico de respaldo.`
+        ok: true,
+        youtubeId: ytId,
+        message: `Video de YouTube (${ytId}) listo en el reproductor del visor.`
       });
     }
 
