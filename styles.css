@@ -1733,3 +1733,13 @@ body::before {
   margin-right: 4px;
 }
 
+/* Eliminar el fondo azul claro del gestor de contraseñas de Chrome/Edge */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #0e120c inset !important;
+  -webkit-text-fill-color: #f2ead8 !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+

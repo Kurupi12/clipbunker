@@ -356,7 +356,12 @@ function openModeratorModal() {
   const errEl = document.getElementById('modLoginError');
   if (errEl) errEl.textContent = '';
   document.getElementById('moderatorModal').classList.add('open');
-  if (input) setTimeout(() => input.focus(), 100);
+  if (input) {
+    setTimeout(() => {
+      input.value = '';
+      input.focus();
+    }, 150);
+  }
 }
 
 function closeModeratorModal() {
