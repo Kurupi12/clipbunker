@@ -474,14 +474,20 @@
             <canvas id="tiktokStudioCanvas" width="1080" height="1920"></canvas>
           </div>
 
-          <!-- Indicador de fuente activa y botón para recargar -->
-          <div style="display:flex; justify-content:space-between; align-items:center; width:360px; max-width:100%; margin-top:6px; margin-bottom:4px;">
+          <!-- Indicador de fuente activa y botones de control del visor -->
+          <div style="display:flex; justify-content:space-between; align-items:center; width:360px; max-width:100%; margin-top:6px; margin-bottom:4px; flex-wrap:wrap; gap:4px;">
             <span id="studioVideoSourceBadge" class="tag-pill" style="color:#ff4d4d; border-color:#ff4d4d; font-size:0.72rem;">
               <svg class="svg-icon" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg> FUENTE: YOUTUBE DIRECTO
             </span>
-            <button type="button" class="btn btn-military" style="font-size:0.72rem; padding:3px 10px;" onclick="reloadStudioYoutube()">
-              <svg class="svg-icon" viewBox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg> Recargar Video
-            </button>
+            <div style="display:flex; gap:6px;">
+              <button type="button" class="btn btn-amber" id="btnToggleVisorFit" style="font-size:0.72rem; padding:3px 10px;" onclick="toggleVisorFitMode()">
+                <svg class="svg-icon" viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+                Llenar Visor (Grande)
+              </button>
+              <button type="button" class="btn btn-military" style="font-size:0.72rem; padding:3px 10px;" onclick="reloadStudioYoutube()">
+                <svg class="svg-icon" viewBox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg> Recargar
+              </button>
+            </div>
           </div>
 
           <!-- Guía visual de márgenes de Zona Segura (solo vista previa) -->

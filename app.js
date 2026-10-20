@@ -1537,6 +1537,30 @@ function onCropModeChange() {
 }
 
 let isStudioYoutubeActive = true;
+let visorFitMode = 'fill'; // 'fill' = Llenar visor a mayor tamaño sin barras negras; 'fit' = 16:9 completo con barras
+
+function toggleVisorFitMode() {
+  visorFitMode = visorFitMode === 'fill' ? 'fit' : 'fill';
+  const ytWrapper = document.getElementById('studioYoutubeWrapper');
+  const btn = document.getElementById('btnToggleVisorFit');
+
+  if (ytWrapper) {
+    if (visorFitMode === 'fill') {
+      ytWrapper.classList.add('fill-visor');
+      ytWrapper.classList.remove('fit-16-9');
+      if (btn) btn.innerHTML = `${svgIcon('maximize')} Llenar Visor (Grande)`;
+      if (btn) btn.className = 'btn btn-amber';
+    } else {
+      ytWrapper.classList.remove('fill-visor');
+      ytWrapper.classList.add('fit-16-9');
+      if (btn) btn.innerHTML = `${svgIcon('minimize')} 16:9 Completo`;
+      if (btn) btn.className = 'btn btn-military';
+    }
+  }
+
+  syncFramingUIFromState();
+  drawStudioFrame(false);
+}
 
 function loadStudioYouTubeVideo(youtubeId) {
   if (!youtubeId) return;
@@ -1551,6 +1575,15 @@ function loadStudioYouTubeVideo(youtubeId) {
       ytWrapper.classList.add('safe_full_1320');
     } else {
       ytWrapper.classList.remove('safe_full_1320');
+    }
+
+    // Por defecto aplicar modo Llenar Visor (A mayor tamaño - sin barras negras)
+    if (visorFitMode === 'fill') {
+      ytWrapper.classList.add('fill-visor');
+      ytWrapper.classList.remove('fit-16-9');
+    } else {
+      ytWrapper.classList.remove('fill-visor');
+      ytWrapper.classList.add('fit-16-9');
     }
   }
 
@@ -1575,9 +1608,10 @@ function loadStudioYouTubeVideo(youtubeId) {
 
   const hintText = document.getElementById('visorDragHintText');
   if (hintText) {
-    hintText.innerHTML = `<strong>Video de YouTube en vivo</strong> dentro del visor táctico 9:16`;
+    hintText.innerHTML = `<strong>Video en tamaño completo 9:16</strong> dentro del visor militar`;
   }
 
+  syncFramingUIFromState();
   drawStudioFrame(false);
 }
 
@@ -1849,10 +1883,19 @@ function syncFramingUIFromState() {
 
   const ytIframe = document.getElementById('studioYoutubeIframe');
   if (ytIframe && isStudioYoutubeActive) {
-    const shiftX = (0.5 - studioPanX) * 40 * (studioZoom - 1);
-    const shiftY = (0.5 - studioPanY) * 40 * (studioZoom - 1);
-    ytIframe.style.transform = `scale(${studioZoom}) translate(${shiftX}px, ${shiftY}px)`;
-    ytIframe.style.transformOrigin = 'center center';
+    if (visorFitMode === 'fill') {
+      // En modo 'fill', el iframe ya está centrado y mide 616px para llenar el visor de 347px de alto sin barras negras
+      // Con studioPanX (0 = izquierda, 0.5 = centro, 1 = derecha) y studioZoom:
+      const panOffsetPx = (0.5 - studioPanX) * 350 * studioZoom;
+      const panOffsetY = (0.5 - studioPanY) * 120 * (studioZoom - 1);
+      ytIframe.style.transform = `translate(calc(-50% + ${panOffsetPx}px), calc(-50% + ${panOffsetY}px)) scale(${studioZoom})`;
+      ytIframe.style.transformOrigin = 'center center';
+    } else {
+      const shiftX = (0.5 - studioPanX) * 40 * (studioZoom - 1);
+      const shiftY = (0.5 - studioPanY) * 40 * (studioZoom - 1);
+      ytIframe.style.transform = `scale(${studioZoom}) translate(${shiftX}px, ${shiftY}px)`;
+      ytIframe.style.transformOrigin = 'center center';
+    }
   }
 }
 
