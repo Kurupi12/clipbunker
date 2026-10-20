@@ -2294,28 +2294,22 @@ function drawStudioFrame(transparentOverlayOnly = false) {
     ctx.textAlign = 'center';
     wrapTextCanvas(ctx, hookText.toUpperCase(), SAFE_CX, videoBoxY + 98, SAFE_W - 40, 44);
 
-    // Datos del usuario y CTA en la parte baja de la Zona Segura (con íconos SVG y sin línea de recuadro)
+    // Datos del usuario y CTA en la parte baja de la Zona Segura (sin foto de perfil ni línea de recuadro)
     const botBase = videoBoxY + videoBoxH - 185;
     ctx.fillStyle = 'rgba(14, 16, 12, 0.78)';
     ctx.fillRect(SAFE_X + 6, botBase, SAFE_W - 12, 179);
 
-    ctx.fillStyle = '#5865F2';
-    ctx.fillRect(SAFE_X + 24, botBase + 14, 84, 84);
-    drawCanvasSvgIcon(ctx, 'gamepad', SAFE_X + 42, botBase + 32, 48, '#ffffff', 2.2);
-
-    ctx.textAlign = 'left';
+    ctx.textAlign = 'center';
     ctx.fillStyle = '#a8b2ff';
     ctx.font = 'bold 19px "Chakra Petch", sans-serif';
-    ctx.fillText('JUGADA COMPARTIDA EN EL PORTAL POR:', SAFE_X + 126, botBase + 34);
+    ctx.fillText('JUGADA COMPARTIDA EN EL PORTAL POR:', SAFE_CX, botBase + 32);
 
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 34px "Oswald", sans-serif';
-    ctx.fillText(authorText, SAFE_X + 126, botBase + 68);
+    ctx.font = 'bold 36px "Oswald", sans-serif';
+    ctx.fillText(authorText, SAFE_CX, botBase + 68);
 
-    drawCanvasSvgIcon(ctx, 'map', SAFE_X + 126, botBase + 76, 22, primaryColor, 2.2);
-    ctx.fillStyle = primaryColor;
     ctx.font = 'bold 20px "Chakra Petch", monospace';
-    ctx.fillText(mapRoleText, SAFE_X + 156, botBase + 96);
+    drawCenteredTextWithSvgIcon(ctx, 'map', 22, primaryColor, mapRoleText, primaryColor, SAFE_CX, botBase + 98, 8);
 
     ctx.font = 'bold 24px "Oswald", sans-serif';
     drawCenteredTextWithSvgIcon(ctx, 'globe', 24, primaryColor, 'MIRA MÁS CLIPS Y VOTA EN: CLIPBUNKER.VERCEL.APP', '#e2d9c5', SAFE_CX, botBase + 138, 10);
@@ -2372,27 +2366,31 @@ function drawStudioFrame(transparentOverlayOnly = false) {
     );
 
     // 4. Bloque del Nombre del Usuario debajo del visor (Y = 1372..1480)
-    // Con Ícono Control/Discord en SVG Vectorial y SIN línea de recuadro alrededor del nombre
-    const footerY = videoBoxY + videoBoxH + 12; // 1372 px
+    // Sin foto de perfil ni línea de recuadro, centrado limpiamente en la Zona Segura
+    const footerY = videoBoxY + videoBoxH + 16; // 1376 px
 
-    ctx.fillStyle = '#5865F2';
-    ctx.fillRect(SAFE_X + 16, footerY + 10, 96, 96);
-    drawCanvasSvgIcon(ctx, 'gamepad', SAFE_X + 36, footerY + 30, 56, '#ffffff', 2.2);
-
-    ctx.textAlign = 'left';
+    ctx.textAlign = 'center';
     ctx.fillStyle = '#a8b2ff';
     ctx.font = 'bold 21px "Chakra Petch", sans-serif';
-    ctx.fillText('JUGADA COMPARTIDA EN EL PORTAL POR:', SAFE_X + 132, footerY + 34);
+    ctx.fillText('JUGADA COMPARTIDA EN EL PORTAL POR:', SAFE_CX, footerY + 28);
 
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 38px "Oswald", sans-serif';
-    ctx.fillText(authorText, SAFE_X + 132, footerY + 74);
+    ctx.font = 'bold 42px "Oswald", sans-serif';
+    ctx.fillText(authorText, SAFE_CX, footerY + 70);
 
     // Ícono de Mapa Vectorial SVG + Texto de Mapa y Rol
-    drawCanvasSvgIcon(ctx, 'map', SAFE_X + 132, footerY + 86, 24, primaryColor, 2.2);
-    ctx.fillStyle = primaryColor;
     ctx.font = 'bold 22px "Chakra Petch", monospace';
-    ctx.fillText(mapRoleText, SAFE_X + 164, footerY + 106);
+    drawCenteredTextWithSvgIcon(
+      ctx,
+      'map',
+      24,
+      primaryColor,
+      mapRoleText,
+      primaryColor,
+      SAFE_CX,
+      footerY + 104,
+      10
+    );
 
     // 5. Call to Action Inferior con Globo Vectorial SVG dentro de la Zona Segura (termina en Y = 1554 < 1570)
     ctx.font = 'bold 27px "Oswald", sans-serif';
@@ -2404,14 +2402,14 @@ function drawStudioFrame(transparentOverlayOnly = false) {
       'MIRA MÁS CLIPS Y VOTA EN: CLIPBUNKER.VERCEL.APP',
       '#e2d9c5',
       SAFE_CX,
-      footerY + 150,
+      footerY + 148,
       10
     );
 
     ctx.textAlign = 'center';
     ctx.fillStyle = primaryColor;
     ctx.font = '21px "Chakra Petch", monospace';
-    ctx.fillText('SUBE TUS JUGADAS DE HELL LET LOOSE CON TU DISCORD', SAFE_CX, footerY + 182);
+    ctx.fillText('SUBE TUS JUGADAS DE HELL LET LOOSE CON TU DISCORD', SAFE_CX, footerY + 180);
   }
 
   // =========================================================================
