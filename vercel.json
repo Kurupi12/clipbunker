@@ -2,7 +2,8 @@
   "version": 2,
   "functions": {
     "api/index.js": {
-      "includeFiles": "{styles.css,app.js,index.html,fallback_preview.mp4,yt_source_*.mp4,data/**,public/**}"
+      "maxDuration": 60,
+      "includeFiles": "{styles.css,app.js,index.html,bin/yt-dlp,data/**,public/**}"
     }
   },
   "rewrites": [

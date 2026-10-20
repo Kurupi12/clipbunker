@@ -471,6 +471,14 @@
             <div id="studioYoutubeWrapper" class="studio-youtube-layer">
               <iframe id="studioYoutubeIframe" src="" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
             </div>
+            <!-- Overlay visual interactivo para arrastrar y soltar videos MP4 -->
+            <div id="studioDropzoneOverlay" class="studio-dropzone-overlay" style="display:none;">
+              <div class="studio-dropzone-content">
+                <svg class="svg-icon" style="width:48px; height:48px; margin-bottom:8px;" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <strong style="font-size:1.05rem; letter-spacing:1px;">SOLTAR VIDEO MP4 AQUÍ</strong>
+                <span style="font-size:0.8rem; opacity:0.85;">Carga instantánea y sincronización con el servidor</span>
+              </div>
+            </div>
             <canvas id="tiktokStudioCanvas" width="1080" height="1920"></canvas>
           </div>
 
@@ -561,19 +569,42 @@
               </select>
             </div>
 
-            <div style="grid-column: 1 / -1; margin-top:-6px; margin-bottom:10px; background:rgba(0,0,0,0.35); border:1px dashed var(--olive-bright); border-radius:6px; padding:10px 14px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
-              <div style="font-size:0.8rem; color:var(--paper-muted); line-height:1.3;">
-                <strong style="color:var(--amber-command); display:block; margin-bottom:2px;">
-                  <svg class="svg-icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                  Cargar Video MP4 del Clip (Desde tu PC):
-                </strong>
-                Carga el archivo de video de tu jugada directamente desde tu PC para previsualizarlo y encuadrarlo a 60 FPS en el visor.
+            <!-- CENTRO TÁCTICO DE OBTENCIÓN Y SINCRONIZACIÓN DE CUALQUIER CLIP GANADOR -->
+            <div style="grid-column: 1 / -1; margin-top:-6px; margin-bottom:12px; background:rgba(0,0,0,0.45); border:1px solid var(--amber-command); border-radius:6px; padding:12px 14px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+                <div style="font-size:0.8rem; color:var(--amber-command); font-weight:700; display:flex; align-items:center; gap:6px;">
+                  <svg class="svg-icon" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                  OBTENCIÓN Y CONTROL DEL VIDEO GANADOR (CUALQUIER CLIP)
+                </div>
+                <span id="studioActiveClipYtBadge" class="tag-pill" style="color:var(--paper-aged); border-color:var(--steel-border); font-size:0.72rem;">
+                  YOUTUBE ID: <span id="currentYtIdDisplay">---</span>
+                </span>
               </div>
-              <label class="btn btn-amber" style="font-size:0.78rem; padding:6px 14px; cursor:pointer; flex-shrink:0;">
-                <svg class="svg-icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                Seleccionar Video Local
-                <input type="file" id="studioLocalVideoFile" accept="video/mp4,video/webm,video/quicktime" style="display:none;" onchange="handleStudioLocalVideoFile(event)" />
-              </label>
+
+              <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+                <!-- Botón 1: Descarga directa 1-Click del video de YouTube en alta definición -->
+                <button type="button" class="btn btn-amber" id="btnFastDownloadClip" onclick="openFastClipDownloader()" style="font-size:0.76rem; padding:6px 12px;">
+                  <svg class="svg-icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  Descargar MP4 de este Clip (1-Click)
+                </button>
+
+                <!-- Botón 2: Selector de archivo local / arrastrar MP4 -->
+                <label class="btn btn-military" style="font-size:0.76rem; padding:6px 12px; cursor:pointer;">
+                  <svg class="svg-icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                  Cargar / Arrastrar MP4
+                  <input type="file" id="studioLocalVideoFile" accept="video/mp4,video/webm,video/quicktime" style="display:none;" onchange="handleStudioLocalVideoFile(event)" />
+                </label>
+
+                <!-- Botón 3: Ver en YouTube en pestaña nueva -->
+                <a id="btnOpenClipOnYoutube" href="#" target="_blank" rel="noopener" class="btn btn-military" style="font-size:0.76rem; padding:6px 12px; text-decoration:none;">
+                  <svg class="svg-icon" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                  Ver en YouTube
+                </a>
+              </div>
+
+              <div style="font-size:0.74rem; color:var(--paper-muted); line-height:1.35;">
+                ⚡ <strong>Tip:</strong> Puedes <strong>arrastrar cualquier video MP4 directamente sobre el visor 9:16</strong> del celular. Al soltarlo, se carga y se sincroniza al servidor para renderizarse con FFmpeg.
+              </div>
             </div>
 
             <div class="form-field">
@@ -1101,6 +1132,56 @@
           </button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- ====================================================================
+       MODAL 5: DESCARGA RÁPIDA 1-CLICK DE CUALQUIER CLIP DE YOUTUBE
+       ==================================================================== -->
+  <div id="fastDownloadModal" class="modal-backdrop">
+    <div class="modal-dossier" style="max-width:540px;">
+      <button class="modal-close" onclick="closeFastDownloadModal()" aria-label="Cerrar">
+        <svg class="svg-icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+      <span class="briefing-badge">DESCARGA RÁPIDA // CUALQUIER CLIP DE YOUTUBE</span>
+      <h3 style="font-family:var(--font-stencil); font-size:1.4rem; margin-bottom:8px;">
+        OBTENER MP4 DEL CLIP GANADOR
+      </h3>
+      <p style="font-size:0.86rem; color:var(--paper-muted); margin-bottom:14px;" id="fastDownloadClipTitle">
+        Descarga el archivo original en video de esta jugada para tenerlo en tu PC y renderizarlo a máxima calidad:
+      </p>
+
+      <div style="background:#0e120c; border:1px solid var(--steel-border); padding:12px; border-radius:6px; margin-bottom:16px;">
+        <div style="font-size:0.78rem; color:var(--amber-command); font-weight:700; margin-bottom:4px;">
+          URL DIRECTA DEL VIDEO:
+        </div>
+        <div style="display:flex; gap:8px;">
+          <input type="text" id="fastDownloadUrlInput" readonly class="tactical-input" style="font-family:monospace; font-size:0.82rem;" />
+          <button type="button" class="btn btn-amber" onclick="copyFastDownloadUrl()" style="flex-shrink:0;">
+            <svg class="svg-icon" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            Copiar
+          </button>
+        </div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <a id="btnLinkCobalt" href="#" target="_blank" rel="noopener" class="btn btn-amber" style="justify-content:center; text-decoration:none; padding:10px 14px;">
+          <svg class="svg-icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Descargar en Cobalt.tools (Sin Anuncios)
+        </a>
+        <a id="btnLinkSSYouTube" href="#" target="_blank" rel="noopener" class="btn btn-military" style="justify-content:center; text-decoration:none; padding:10px 14px;">
+          <svg class="svg-icon" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          Descargar en SSYouTube.com
+        </a>
+        <a id="btnLinkY2Mate" href="#" target="_blank" rel="noopener" class="btn btn-military" style="justify-content:center; text-decoration:none; padding:10px 14px;">
+          <svg class="svg-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+          Descargar en Y2Mate.nu
+        </a>
+      </div>
+
+      <div style="margin-top:16px; padding:10px; background:rgba(255,174,66,0.1); border:1px dashed var(--amber-command); border-radius:4px; font-size:0.8rem; color:var(--paper-aged);">
+        🎯 <strong>Paso siguiente:</strong> Una vez descargado el archivo <code>.mp4</code> en tu PC, simplemente <strong>arrástralo sobre el visor 9:16</strong> del celular. Se sincronizará automáticamente para renderizar con FFmpeg.
+      </div>
     </div>
   </div>
 

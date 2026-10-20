@@ -70,11 +70,49 @@ function getFFmpegBinary() {
 }
 
 function getYtDlpBinary() {
-  const localWin = path.join(BIN_DIR, 'yt-dlp.exe');
-  const localUnix = path.join(BIN_DIR, 'yt-dlp');
-  if (fs.existsSync(localWin)) return localWin;
-  if (fs.existsSync(localUnix)) return localUnix;
-  return 'yt-dlp';
+  if (process.platform === 'win32') {
+    const candidatesWin = [
+      path.join(BIN_DIR, 'yt-dlp.exe'),
+      path.join(__dirname, 'bin', 'yt-dlp.exe'),
+      path.join(process.cwd(), 'bin', 'yt-dlp.exe')
+    ];
+    for (const c of candidatesWin) {
+      if (fs.existsSync(c)) return c;
+    }
+    return 'yt-dlp.exe';
+  } else {
+    // Linux / Vercel Serverless
+    const tmpBin = path.join('/tmp', 'bin', 'yt-dlp');
+    if (fs.existsSync(tmpBin)) {
+      try {
+        fs.chmodSync(tmpBin, 0o755);
+      } catch (e) {}
+      return tmpBin;
+    }
+    const candidatesUnix = [
+      path.join(__dirname, 'bin', 'yt-dlp'),
+      path.join(process.cwd(), 'bin', 'yt-dlp'),
+      path.join(BIN_DIR, 'yt-dlp')
+    ];
+    for (const c of candidatesUnix) {
+      if (fs.existsSync(c)) {
+        try {
+          const tmpDir = path.join('/tmp', 'bin');
+          if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
+          fs.copyFileSync(c, tmpBin);
+          fs.chmodSync(tmpBin, 0o755);
+          return tmpBin;
+        } catch (copyErr) {
+          console.warn('[YT-DLP COPY/CHMOD ERROR]', copyErr);
+          try {
+            fs.chmodSync(c, 0o755);
+            return c;
+          } catch (e2) {}
+        }
+      }
+    }
+    return 'yt-dlp';
+  }
 }
 
 function extractYouTubeId(url) {
@@ -85,7 +123,8 @@ function extractYouTubeId(url) {
 }
 
 app.use(cors());
-app.use(express.json({ limit: '35mb' }));
+app.use(express.json({ limit: '80mb' }));
+app.use(express.urlencoded({ extended: true, limit: '80mb' }));
 app.use('/exports', express.static(EXPORTS_DIR));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.static(__dirname));
@@ -749,6 +788,48 @@ function findSourceVideoFile(ytId) {
 // ============================================================================
 // 4. ESTUDIO 9:16 INTERNO DEL MODERADOR (DESCARGA YOUTUBE + MARCO WWII)
 // ============================================================================
+
+// Sube o sincroniza el archivo MP4 de CUALQUIER clip ganador directamente al servidor
+app.post('/api/tiktok/upload-source', requireModerator, (req, res) => {
+  try {
+    const { clipId, videoUrl, videoBase64 } = req.body;
+    const ytId = extractYouTubeId(videoUrl) || String(clipId || 'clip').replace(/[^a-zA-Z0-9_-]/g, '');
+    if (!videoBase64) {
+      return res.status(400).json({ ok: false, message: 'No se recibieron datos de video.' });
+    }
+
+    const targetFilename = `yt_source_${ytId}.mp4`;
+    const targetPath = path.join(EXPORTS_DIR, targetFilename);
+
+    let cleanB64 = videoBase64;
+    if (cleanB64.includes(';base64,')) {
+      cleanB64 = cleanB64.split(';base64,')[1];
+    }
+
+    const buffer = Buffer.from(cleanB64, 'base64');
+    if (buffer.length < 500) {
+      return res.status(400).json({ ok: false, message: 'Archivo de video inválido o vacío.' });
+    }
+
+    if (!fs.existsSync(EXPORTS_DIR)) {
+      fs.mkdirSync(EXPORTS_DIR, { recursive: true });
+    }
+
+    fs.writeFileSync(targetPath, buffer);
+    console.log(`[HLL STUDIO] Video MP4 sincronizado para clip (${ytId}): ${targetPath} (${(buffer.length / (1024 * 1024)).toFixed(2)} MB)`);
+
+    return res.json({
+      ok: true,
+      youtubeId: ytId,
+      localVideoUrl: `/exports/${targetFilename}`,
+      message: `¡Video fuente del clip (${ytId}) sincronizado con éxito (${(buffer.length / (1024 * 1024)).toFixed(1)} MB)! Listo para encuadrar y renderizar.`
+    });
+  } catch (err) {
+    console.error('[UPLOAD SOURCE ERROR]', err);
+    res.status(500).json({ ok: false, message: 'Error al sincronizar video: ' + err.message });
+  }
+});
+
 app.post('/api/tiktok/download-source', requireModerator, (req, res) => {
   const { videoUrl } = req.body;
   const ytId = extractYouTubeId(videoUrl);
@@ -777,14 +858,6 @@ app.post('/api/tiktok/download-source', requireModerator, (req, res) => {
     });
   }
 
-  if (isVercel) {
-    return res.json({
-      ok: true,
-      youtubeId: ytId,
-      message: `Clip de YouTube (${ytId}) sincronizado en el visor 9:16.`
-    });
-  }
-
   const ytdlpBin = getYtDlpBinary();
   const ffmpegBin = getFFmpegBinary();
 
@@ -799,19 +872,21 @@ app.post('/api/tiktok/download-source', requireModerator, (req, res) => {
     `https://www.youtube.com/watch?v=${ytId}`
   ];
 
-  execFile(ytdlpBin, args, { timeout: 120000 }, (err) => {
-    if (err || !fs.existsSync(targetPath) || fs.statSync(targetPath).size < 1000) {
+  execFile(ytdlpBin, args, { timeout: isVercel ? 25000 : 120000 }, (err) => {
+    if (!err && fs.existsSync(targetPath) && fs.statSync(targetPath).size > 1000) {
       return res.json({
         ok: true,
-        youtubeId: ytId,
-        message: `Video de YouTube (${ytId}) listo en el reproductor del visor.`
+        localVideoUrl: publicUrl,
+        message: `Video de YouTube descargado con éxito (${publicUrl}) y cargado en el visor táctico.`
       });
     }
 
+    // Si yt-dlp no pudo descargar en la nube (ej: restricción de bot de YouTube en datacenter)
     res.json({
       ok: true,
-      localVideoUrl: publicUrl,
-      message: `Video de YouTube descargado con éxito (${publicUrl}) y cargado en el lienzo 9:16.`
+      youtubeId: ytId,
+      needsManualUpload: true,
+      message: `Video de YouTube (${ytId}) sincronizado en el reproductor del visor. Si deseas renderizarlo con FFmpeg en la nube, arrastra su archivo MP4 o usa la Descarga Rápida 1-Click.`
     });
   });
 });
@@ -865,17 +940,12 @@ app.post('/api/tiktok/render', requireModerator, (req, res) => {
   }
 
   const runFFmpegRender = (inputVideoFile, publicSourceUrl) => {
-    const fallbackPath = ensureFallbackPreviewVideo() || path.join(EXPORTS_DIR, 'fallback_yt_preview.mp4');
     if (!fs.existsSync(inputVideoFile) || fs.statSync(inputVideoFile).size < 1000) {
-      inputVideoFile = fallbackPath;
-      publicSourceUrl = '/exports/fallback_yt_preview.mp4';
-    }
-
-    if (!fs.existsSync(inputVideoFile)) {
-      return res.json({
+      return res.status(400).json({
         ok: false,
+        needsSourceUpload: true,
         overlayUrl: `/exports/${overlayFilename}`,
-        message: 'No se encontró el video fuente en el servidor. Usa "Grabar Preview 9:16 (5s)" para exportar directamente desde tu navegador.'
+        message: 'No se encontró el archivo de video fuente para este clip.'
       });
     }
 
@@ -954,11 +1024,6 @@ app.post('/api/tiktok/render', requireModerator, (req, res) => {
     return runFFmpegRender(ytSourcePath, `/exports/yt_source_${ytId}.mp4`);
   }
 
-  if (isVercel) {
-    const fallbackPath = ensureFallbackPreviewVideo() || path.join(EXPORTS_DIR, 'fallback_yt_preview.mp4');
-    return runFFmpegRender(fallbackPath, '/exports/fallback_yt_preview.mp4');
-  }
-
   const ytdlpBin = getYtDlpBinary();
   const ffmpegBin = getFFmpegBinary();
   execFile(
@@ -973,14 +1038,20 @@ app.post('/api/tiktok/render', requireModerator, (req, res) => {
       '-o', ytSourcePath,
       `https://www.youtube.com/watch?v=${ytId}`
     ],
-    { timeout: 120000 },
+    { timeout: isVercel ? 25000 : 120000 },
     (ytErr) => {
       if (!ytErr && fs.existsSync(ytSourcePath) && fs.statSync(ytSourcePath).size > 1000) {
         return runFFmpegRender(ytSourcePath, `/exports/yt_source_${ytId}.mp4`);
       }
-      ensureFallbackPreviewVideo();
-      const fallbackPath = path.join(EXPORTS_DIR, 'fallback_yt_preview.mp4');
-      return runFFmpegRender(fallbackPath, '/exports/fallback_yt_preview.mp4');
+
+      console.warn(`[RENDER] yt-dlp no pudo descargar el video ${ytId} automáticamente:`, ytErr?.message);
+      return res.status(400).json({
+        ok: false,
+        needsSourceUpload: true,
+        youtubeId: ytId,
+        overlayUrl: `/exports/${overlayFilename}`,
+        message: `El video de YouTube (${ytId}) requiere carga directa para renderizarse en este servidor. Arrastra el archivo MP4 del clip al visor táctico o usa la Descarga Rápida 1-Click.`
+      });
     }
   );
 });

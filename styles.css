@@ -1068,6 +1068,35 @@ body::before {
   pointer-events: none;
 }
 
+.studio-dropzone-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(12, 16, 10, 0.92);
+  border: 3px dashed var(--amber-command);
+  border-radius: 6px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  animation: pulse-dropzone 1.5s infinite alternate;
+}
+
+.studio-dropzone-content {
+  text-align: center;
+  color: var(--amber-command);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 20px;
+}
+
+@keyframes pulse-dropzone {
+  from { background: rgba(12, 16, 10, 0.88); border-color: var(--amber-command); }
+  to { background: rgba(30, 24, 12, 0.95); border-color: #ffd07a; }
+}
+
 #tiktokStudioCanvas.dragging {
   cursor: grabbing;
 }

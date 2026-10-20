@@ -1641,6 +1641,13 @@ function onStudioClipChange() {
   updateFFmpegCommandBox();
 
   const ytId = clip.youtubeId || extractYouTubeId(clip.videoUrl);
+
+  const currentYtDisplay = document.getElementById('currentYtIdDisplay');
+  if (currentYtDisplay) currentYtDisplay.textContent = ytId || '---';
+
+  const btnOpenYt = document.getElementById('btnOpenClipOnYoutube');
+  if (btnOpenYt && ytId) btnOpenYt.href = `https://www.youtube.com/watch?v=${ytId}`;
+
   if (ytId) {
     loadStudioYouTubeVideo(ytId);
   } else if (!uploadedVideoElement) {
@@ -1653,8 +1660,7 @@ function onStudioClipChange() {
   }
 }
 
-function handleStudioLocalVideoFile(event) {
-  const file = event?.target?.files?.[0];
+function processUploadedVideoFile(file) {
   if (!file) return;
 
   isStudioYoutubeActive = false;
@@ -1664,13 +1670,11 @@ function handleStudioLocalVideoFile(event) {
   if (iframe) iframe.src = '';
 
   const canvas = document.getElementById('tiktokStudioCanvas');
-  if (canvas) {
-    canvas.style.pointerEvents = 'auto';
-  }
+  if (canvas) canvas.style.pointerEvents = 'auto';
 
   const badge = document.getElementById('studioVideoSourceBadge');
   if (badge) {
-    badge.innerHTML = `<svg class="svg-icon" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/></svg> ARCHIVO LOCAL: ${escapeHtml(file.name.slice(0, 22))}`;
+    badge.innerHTML = `<svg class="svg-icon" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/></svg> MP4 LOCAL: ${escapeHtml(file.name.slice(0, 18))} (${(file.size / (1024 * 1024)).toFixed(1)}MB)`;
     badge.style.color = 'var(--amber-command)';
     badge.style.borderColor = 'var(--amber-command)';
   }
@@ -1683,8 +1687,139 @@ function handleStudioLocalVideoFile(event) {
   const statusEl = document.getElementById('recordStatusText');
   const url = URL.createObjectURL(file);
   loadVideoUrlIntoPreview(url);
+
   if (statusEl) {
-    setStatusWithSvg(statusEl, 'check', `Video local cargado con éxito: ${escapeHtml(file.name)} (${(file.size / (1024 * 1024)).toFixed(1)} MB). Puedes encuadrarlo arrastrando en el visor.`);
+    setStatusWithSvg(statusEl, 'clock', `Sincronizando video con el servidor para renderizado FFmpeg (${(file.size / (1024 * 1024)).toFixed(1)} MB)...`);
+  }
+
+  const sel = document.getElementById('studioClipSelect');
+  const clip = clipsData.find(c => c.id === sel?.value) || clipsData[0] || { id: 'clip' };
+  const ytId = clip.youtubeId || extractYouTubeId(clip.videoUrl) || clip.id;
+
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try {
+      const base64Data = e.target.result;
+      const res = await fetch('/api/tiktok/upload-source', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-mod-token': modToken
+        },
+        body: JSON.stringify({
+          clipId: clip.id,
+          videoUrl: clip.videoUrl,
+          videoBase64: base64Data,
+          filename: file.name
+        })
+      });
+      const data = await res.json();
+      if (statusEl) {
+        setStatusWithSvg(
+          statusEl,
+          data.ok ? 'check' : 'alert',
+          data.ok
+            ? `¡Video fuente del clip (${ytId}) sincronizado con éxito! Listo para renderizar en MP4 9:16.`
+            : (data.message || 'Error al sincronizar video.')
+        );
+      }
+    } catch (upErr) {
+      if (statusEl) {
+        setStatusWithSvg(statusEl, 'check', `Video local cargado en el visor (${(file.size / (1024 * 1024)).toFixed(1)} MB). Puedes encuadrarlo arrastrando.`);
+      }
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function handleStudioLocalVideoFile(event) {
+  const file = event?.target?.files?.[0];
+  if (file) {
+    processUploadedVideoFile(file);
+  }
+}
+
+function initStudioDropzone() {
+  const container = document.getElementById('studioCanvasWrapper');
+  const overlay = document.getElementById('studioDropzoneOverlay');
+  if (!container) return;
+
+  ['dragenter', 'dragover'].forEach(eventName => {
+    container.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (overlay) overlay.style.display = 'flex';
+    });
+  });
+
+  ['dragleave', 'dragend'].forEach(eventName => {
+    container.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (overlay && !container.contains(e.relatedTarget)) {
+        overlay.style.display = 'none';
+      }
+    });
+  });
+
+  container.addEventListener('drop', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (overlay) overlay.style.display = 'none';
+    const files = e.dataTransfer?.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      if (file.type.startsWith('video/') || file.name.match(/\.(mp4|webm|mov|mkv)$/i)) {
+        processUploadedVideoFile(file);
+      } else {
+        const statusEl = document.getElementById('recordStatusText');
+        if (statusEl) setStatusWithSvg(statusEl, 'alert', 'Por favor suelta un archivo de video válido (.mp4, .webm, .mov).');
+      }
+    }
+  });
+}
+
+function openFastClipDownloader() {
+  const sel = document.getElementById('studioClipSelect');
+  const clip = clipsData.find(c => c.id === sel?.value) || clipsData[0];
+  if (!clip) return;
+
+  const ytId = clip.youtubeId || extractYouTubeId(clip.videoUrl) || '';
+  const fullUrl = `https://www.youtube.com/watch?v=${ytId}`;
+
+  const titleEl = document.getElementById('fastDownloadClipTitle');
+  if (titleEl) {
+    titleEl.innerHTML = `Descarga el video original de la jugada: <strong>${escapeHtml(clip.title)}</strong> (por ${escapeHtml(clip.authorDiscord)})`;
+  }
+
+  const urlInput = document.getElementById('fastDownloadUrlInput');
+  if (urlInput) urlInput.value = fullUrl;
+
+  const linkCobalt = document.getElementById('btnLinkCobalt');
+  if (linkCobalt) linkCobalt.href = 'https://cobalt.tools/';
+
+  const linkSS = document.getElementById('btnLinkSSYouTube');
+  if (linkSS) linkSS.href = `https://ssyoutube.com/watch?v=${ytId}`;
+
+  const linkY2 = document.getElementById('btnLinkY2Mate');
+  if (linkY2) linkY2.href = `https://www.y2mate.nu/es/youtube/${ytId}`;
+
+  const modal = document.getElementById('fastDownloadModal');
+  if (modal) modal.classList.add('active');
+}
+
+function closeFastDownloadModal() {
+  const modal = document.getElementById('fastDownloadModal');
+  if (modal) modal.classList.remove('active');
+}
+
+function copyFastDownloadUrl() {
+  const urlInput = document.getElementById('fastDownloadUrlInput');
+  if (urlInput && urlInput.value) {
+    navigator.clipboard.writeText(urlInput.value);
+    const statusEl = document.getElementById('recordStatusText');
+    if (statusEl) setStatusWithSvg(statusEl, 'copy', 'URL de YouTube copiada al portapapeles.');
+    alert('URL de YouTube copiada al portapapeles:\n' + urlInput.value);
   }
 }
 
@@ -1851,6 +1986,9 @@ function initStudioVisorInteractions() {
     syncFramingUIFromState();
     updateFFmpegCommandBox();
   }, { passive: false });
+
+  // Inicializar Drag & Drop directo para cualquier video MP4 sobre el visor
+  initStudioDropzone();
 }
 
 function syncFramingUIFromState() {
@@ -2646,6 +2784,18 @@ async function triggerBackendRender() {
 
     if (data.sourceVideoUrl) {
       loadVideoUrlIntoPreview(data.sourceVideoUrl);
+    }
+
+    if (!data.ok) {
+      if (data.needsSourceUpload) {
+        setStatusWithSvg(
+          statusEl,
+          'alert',
+          'El video real de este clip no pudo descargarse automáticamente en el servidor. Abre la Descarga Rápida (1-Click) y arrastra el archivo MP4 sobre el visor 9:16.'
+        );
+        openFastClipDownloader();
+      }
+      return;
     }
 
     if (data.ok) {
