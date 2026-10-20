@@ -13,6 +13,10 @@
     {
       "source": "/auth/(.*)",
       "destination": "/api/index.js"
+    },
+    {
+      "source": "/exports/(.*)",
+      "destination": "/api/index.js"
     }
   ]
 }

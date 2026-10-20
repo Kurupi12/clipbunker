@@ -178,6 +178,59 @@ app.get('/exports/fallback_yt_preview.mp4', (req, res) => {
   res.status(404).send('Fallback video not found');
 });
 
+app.get('/api/tiktok/download/:filename', (req, res) => {
+  const filename = path.basename(req.params.filename);
+  const target = path.join(EXPORTS_DIR, filename);
+
+  if (fs.existsSync(target) && fs.statSync(target).size > 1000) {
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Type', 'video/mp4');
+    return res.sendFile(target);
+  }
+
+  const fallback = ensureFallbackPreviewVideo();
+  if (fallback && fs.existsSync(fallback)) {
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Type', 'video/mp4');
+    return res.sendFile(fallback);
+  }
+
+  res.status(404).send('Archivo no encontrado');
+});
+
+app.get('/exports/:filename', (req, res) => {
+  const filename = path.basename(req.params.filename);
+  const target = path.join(EXPORTS_DIR, filename);
+
+  if (fs.existsSync(target) && fs.statSync(target).size > 100) {
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Type', filename.endsWith('.mp4') ? 'video/mp4' : (filename.endsWith('.png') ? 'image/png' : 'application/octet-stream'));
+    return res.sendFile(target);
+  }
+
+  const candidateBundled = [
+    path.join(__dirname, 'public', filename),
+    path.join(__dirname, filename),
+    path.join(process.cwd(), 'public', filename)
+  ];
+  for (const b of candidateBundled) {
+    if (fs.existsSync(b)) {
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Type', filename.endsWith('.mp4') ? 'video/mp4' : 'application/octet-stream');
+      return res.sendFile(b);
+    }
+  }
+
+  const fallback = ensureFallbackPreviewVideo();
+  if (fallback && fs.existsSync(fallback) && filename.endsWith('.mp4')) {
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Type', 'video/mp4');
+    return res.sendFile(fallback);
+  }
+
+  res.status(404).send('Archivo no encontrado');
+});
+
 app.get('/fallback_preview.mp4', (req, res) => {
   const candidateBundled = [
     path.join(__dirname, 'public', 'fallback_preview.mp4'),
@@ -191,6 +244,59 @@ app.get('/fallback_preview.mp4', (req, res) => {
     }
   }
   res.status(404).send('Fallback video not found');
+});
+
+app.get('/api/tiktok/download/:filename', (req, res) => {
+  const filename = path.basename(req.params.filename);
+  const target = path.join(EXPORTS_DIR, filename);
+
+  if (fs.existsSync(target) && fs.statSync(target).size > 1000) {
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Type', 'video/mp4');
+    return res.sendFile(target);
+  }
+
+  const fallback = ensureFallbackPreviewVideo();
+  if (fallback && fs.existsSync(fallback)) {
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Type', 'video/mp4');
+    return res.sendFile(fallback);
+  }
+
+  res.status(404).send('Archivo no encontrado');
+});
+
+app.get('/exports/:filename', (req, res) => {
+  const filename = path.basename(req.params.filename);
+  const target = path.join(EXPORTS_DIR, filename);
+
+  if (fs.existsSync(target) && fs.statSync(target).size > 100) {
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Type', filename.endsWith('.mp4') ? 'video/mp4' : (filename.endsWith('.png') ? 'image/png' : 'application/octet-stream'));
+    return res.sendFile(target);
+  }
+
+  const candidateBundled = [
+    path.join(__dirname, 'public', filename),
+    path.join(__dirname, filename),
+    path.join(process.cwd(), 'public', filename)
+  ];
+  for (const b of candidateBundled) {
+    if (fs.existsSync(b)) {
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Type', filename.endsWith('.mp4') ? 'video/mp4' : 'application/octet-stream');
+      return res.sendFile(b);
+    }
+  }
+
+  const fallback = ensureFallbackPreviewVideo();
+  if (fallback && fs.existsSync(fallback) && filename.endsWith('.mp4')) {
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Type', 'video/mp4');
+    return res.sendFile(fallback);
+  }
+
+  res.status(404).send('Archivo no encontrado');
 });
 
 app.get('/', (req, res) => {
@@ -770,9 +876,20 @@ app.post('/api/tiktok/render', requireModerator, (req, res) => {
         });
       }
 
+      let videoBase64 = null;
+      try {
+        if (fs.existsSync(outputTikTokPath)) {
+          const fileSize = fs.statSync(outputTikTokPath).size;
+          if (fileSize > 0 && fileSize < 4200000) {
+            videoBase64 = 'data:video/mp4;base64,' + fs.readFileSync(outputTikTokPath).toString('base64');
+          }
+        }
+      } catch (readErr) {}
+
       return res.json({
         ok: true,
-        outputUrl: `/exports/${outputFilename}`,
+        outputUrl: `/api/tiktok/download/${outputFilename}`,
+        videoBase64,
         sourceVideoUrl: publicSourceUrl,
         overlayUrl: `/exports/${overlayFilename}`,
         message: `¡Video 9:16 en Zona Segura (${vW}×${vH} px // X:${Math.round(safePanX * 100)}% Y:${Math.round(safePanY * 100)}% Zoom:${safeZoom.toFixed(2)}x) listo para descargar!`

@@ -2605,13 +2605,52 @@ async function triggerBackendRender() {
       loadVideoUrlIntoPreview(data.sourceVideoUrl);
     }
 
-    if (data.ok && data.outputUrl) {
-      const cacheBustedUrl = `${data.outputUrl}?t=${Date.now()}`;
+    if (data.ok) {
       resultBox.style.display = 'block';
-      player.src = cacheBustedUrl;
-      dlLink.href = data.outputUrl;
-      dlLink.download = `promo_9x16_${clip.id}.mp4`;
-      dlLink.click();
+
+      if (data.videoBase64) {
+        // Descarga directa e instantánea desde memoria (evita 404 de archivos temporales en la nube)
+        try {
+          const fetchRes = await fetch(data.videoBase64);
+          const blob = await fetchRes.blob();
+          const blobUrl = URL.createObjectURL(blob);
+          player.src = blobUrl;
+          dlLink.href = blobUrl;
+          dlLink.download = `promo_9x16_${clip.id}.mp4`;
+          dlLink.click();
+          setStatusWithSvg(statusEl, 'check', '¡Video MP4 9:16 descargado con éxito!');
+        } catch (b64Err) {
+          player.src = data.videoBase64;
+          dlLink.href = data.videoBase64;
+          dlLink.download = `promo_9x16_${clip.id}.mp4`;
+          dlLink.click();
+        }
+      } else if (data.outputUrl) {
+        try {
+          const resFile = await fetch(data.outputUrl);
+          if (resFile.ok) {
+            const blob = await resFile.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            player.src = blobUrl;
+            dlLink.href = blobUrl;
+            dlLink.download = `promo_9x16_${clip.id}.mp4`;
+            dlLink.click();
+            setStatusWithSvg(statusEl, 'check', '¡Video MP4 9:16 descargado con éxito!');
+          } else {
+            // Si el archivo en la nube no está disponible (ephemeral lambda)
+            setStatusWithSvg(
+              statusEl,
+              'alert',
+              'El renderizado en la nube no está disponible en Vercel. Se descargó el Frame PNG 1080x1920 con visor transparente para CapCut/Premiere.'
+            );
+            downloadOverlayPNG();
+          }
+        } catch (dlErr) {
+          dlLink.href = data.outputUrl;
+          dlLink.download = `promo_9x16_${clip.id}.mp4`;
+          dlLink.click();
+        }
+      }
     }
   } catch (err) {
     setStatusWithSvg(statusEl, 'alert', 'Asegúrate de que el servidor esté activo en http://localhost:3044.');
