@@ -87,6 +87,7 @@ function extractYouTubeId(url) {
 app.use(cors());
 app.use(express.json({ limit: '35mb' }));
 app.use('/exports', express.static(EXPORTS_DIR));
+app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.static(__dirname));
 
 function requireModerator(req, res, next) {
@@ -178,6 +179,16 @@ app.get('/exports/fallback_yt_preview.mp4', (req, res) => {
   res.status(404).send('Fallback video not found');
 });
 
+app.get('/yt_source_:id.mp4', (req, res) => {
+  const ytId = req.params.id;
+  const found = findSourceVideoFile(ytId);
+  if (found) {
+    res.setHeader('Content-Type', 'video/mp4');
+    return res.sendFile(found.path);
+  }
+  res.status(404).send('Video source not found');
+});
+
 app.get('/api/tiktok/download/:filename', (req, res) => {
   const filename = path.basename(req.params.filename);
   const target = path.join(EXPORTS_DIR, filename);
@@ -244,6 +255,16 @@ app.get('/fallback_preview.mp4', (req, res) => {
     }
   }
   res.status(404).send('Fallback video not found');
+});
+
+app.get('/yt_source_:id.mp4', (req, res) => {
+  const ytId = req.params.id;
+  const found = findSourceVideoFile(ytId);
+  if (found) {
+    res.setHeader('Content-Type', 'video/mp4');
+    return res.sendFile(found.path);
+  }
+  res.status(404).send('Video source not found');
 });
 
 app.get('/api/tiktok/download/:filename', (req, res) => {
@@ -707,6 +728,24 @@ app.post('/api/mod/dispatch-winners', requireModerator, async (req, res) => {
   });
 });
 
+function findSourceVideoFile(ytId) {
+  if (!ytId) return null;
+  const filename = `yt_source_${ytId}.mp4`;
+  const candidates = [
+    path.join(EXPORTS_DIR, filename),
+    path.join(__dirname, 'public', filename),
+    path.join(__dirname, 'data', 'sources', filename),
+    path.join(process.cwd(), 'public', filename),
+    path.join(process.cwd(), 'data', 'sources', filename),
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(c) && fs.statSync(c).size > 1000) {
+      return { path: c, url: `/${filename}` };
+    }
+  }
+  return null;
+}
+
 // ============================================================================
 // 4. ESTUDIO 9:16 INTERNO DEL MODERADOR (DESCARGA YOUTUBE + MARCO WWII)
 // ============================================================================
@@ -715,6 +754,15 @@ app.post('/api/tiktok/download-source', requireModerator, (req, res) => {
   const ytId = extractYouTubeId(videoUrl);
   if (!ytId) {
     return res.status(400).json({ ok: false, message: 'URL de YouTube inválida.' });
+  }
+
+  const foundSource = findSourceVideoFile(ytId);
+  if (foundSource) {
+    return res.json({
+      ok: true,
+      localVideoUrl: foundSource.url,
+      message: `Video de YouTube (${ytId}) listo en el visor táctico en alta definición.`
+    });
   }
 
   const targetFilename = `yt_source_${ytId}.mp4`;
@@ -896,6 +944,11 @@ app.post('/api/tiktok/render', requireModerator, (req, res) => {
       });
     });
   };
+
+  const foundSource = findSourceVideoFile(ytId);
+  if (foundSource) {
+    return runFFmpegRender(foundSource.path, foundSource.url);
+  }
 
   if (fs.existsSync(ytSourcePath) && fs.statSync(ytSourcePath).size > 1000) {
     return runFFmpegRender(ytSourcePath, `/exports/yt_source_${ytId}.mp4`);

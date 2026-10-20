@@ -2,7 +2,7 @@
   "version": 2,
   "functions": {
     "api/index.js": {
-      "includeFiles": "{styles.css,app.js,index.html,fallback_preview.mp4,data/**,public/**}"
+      "includeFiles": "{styles.css,app.js,index.html,fallback_preview.mp4,yt_source_*.mp4,data/**,public/**}"
     }
   },
   "rewrites": [
